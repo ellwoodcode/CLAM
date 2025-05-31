@@ -42,6 +42,14 @@ parser.add_argument('--split', type=str, choices=['train', 'val', 'test', 'all']
 parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'task_2_tumor_subtyping'])
 parser.add_argument('--drop_out', type=float, default=0.25, help='dropout')
 parser.add_argument('--embed_dim', type=int, default=1024)
+
+#added arguments for batch processing
+parser.add_argument('--cohort', type=str, required=True,
+                    help='Name of the cohort folder (e.g., Georgia)')
+parser.add_argument('--cohort_labels', type=str, required=True,
+                    help='Base name of the label file (e.g., Georgia_filtered)')
+
+
 args = parser.parse_args()
 
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -72,8 +80,8 @@ f.close()
 print(settings)
 if args.task == 'task_1_tumor_vs_normal':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = 'dataset_csv/tumor_vs_normal_dummy_clean.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'tumor_vs_normal_resnet_features'),
+    dataset = Generic_MIL_Dataset(csv_path = os.path.join('C:/Users/Mahon/OneDrive/Documents/CLAM/Labels/Textual/', args.cohort_labels + '.csv'),
+                            data_dir= os.path.join(args.data_root_dir, args.cohort),
                             shuffle = False, 
                             print_info = True,
                             label_dict = {'normal_tissue':0, 'tumor_tissue':1},
@@ -124,12 +132,8 @@ if __name__ == "__main__":
     all_auc = []
     all_acc = []
     for ckpt_idx in range(len(ckpt_paths)):
-        if datasets_id[args.split] < 0:
-            split_dataset = dataset
-        else:
-            csv_path = '{}/splits_{}.csv'.format(args.splits_dir, folds[ckpt_idx])
-            datasets = dataset.return_splits(from_id=False, csv_path=csv_path)
-            split_dataset = datasets[datasets_id[args.split]]
+        split_dataset = dataset
+
         model, patient_results, test_error, auc, df  = eval(split_dataset, args, ckpt_paths[ckpt_idx])
         all_results.append(all_results)
         all_auc.append(auc)

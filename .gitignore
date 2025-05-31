@@ -1,3 +1,19 @@
-**/.DS_Store
+# Data and model outputs
+*.svs
+*.pt
+*.h5
+*.npy
+*.zip
+*.tar.gz
+*.csv
+
+# CLAM-specific
+features/
+patches/
+extracted/
+heatmaps/
+logs/
+
+# Python cruft
 __pycache__/
-notebooks
+*.pyc

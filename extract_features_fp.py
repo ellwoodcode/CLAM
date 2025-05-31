@@ -19,6 +19,8 @@ from utils.file_utils import save_hdf5
 from dataset_modules.dataset_h5 import Dataset_All_Bags, Whole_Slide_Bag_FP
 from models import get_encoder
 
+Image.MAX_IMAGE_PIXELS = None
+
 device = torch.device('cuda') if torch.cuda.is_available() else torch.device('cpu')
 
 def compute_w_loader(output_path, loader, model, verbose = 0):
@@ -80,7 +82,7 @@ if __name__ == '__main__':
 	model = model.to(device)
 	total = len(bags_dataset)
 
-	loader_kwargs = {'num_workers': 8, 'pin_memory': True} if device.type == "cuda" else {}
+	loader_kwargs = {'num_workers': 0, 'pin_memory': True} if device.type == "cuda" else {}
 
 	for bag_candidate_idx in tqdm(range(total)):
 		slide_id = bags_dataset[bag_candidate_idx].split(args.slide_ext)[0]
