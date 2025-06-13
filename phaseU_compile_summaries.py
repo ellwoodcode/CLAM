@@ -2,7 +2,7 @@ import os
 import pandas as pd
 
 EVAL_DIR = './eval_results'
-OUT_FILE = 'all_summaries.csv'
+OUT_FILE = 'all_summaries_tangle_1e3.csv'
 
 all_rows = []
 
@@ -13,12 +13,10 @@ for root, dirs, files in os.walk(EVAL_DIR):
             try:
                 df = pd.read_csv(full_path)
                 # Parse model and cohort from path, e.g. EVAL_IMS1_on_Georgia
-                parts = os.path.basename(root).split('_on_')
-                if len(parts) == 2:
-                    model = parts[0].replace('EVAL_', '')
-                    cohort = parts[1]
-                else:
-                    model, cohort = "UNKNOWN", "UNKNOWN"
+                parts = os.path.basename(root).split('_Tangle_on_')
+                model = parts[0].replace('EVAL_TANGLE_', '')
+                cohort = parts[1]
+
                 df['model'] = model
                 df['cohort'] = cohort
                 all_rows.append(df)

@@ -1,0 +1,14 @@
+task: task_1_tumor_vs_normal
+split: test
+save_dir: ./eval_results\EVAL_RNA_IMS1_RNA_on_Carolina
+models_dir: ./IMS1_RNA_Model\IMS1_RNA_integration_s1
+model_type: clam_mb
+model_size: small
+drop_out: 0.25
+cohort: Carolina
+cohort_labels: N.Carolina_filtered
+use_rna_concatenation: True
+rna_data_base_dir: C:/Users/Mahon/Documents/Research/CLAM/rna_seq_files_processed_log_transformed
+master_rna_dim: 19944
+original_patch_feature_dim: 1024
+calculated_embed_dim: 20968

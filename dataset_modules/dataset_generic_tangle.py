@@ -31,8 +31,8 @@ def save_splits(split_datasets, column_keys, filename, boolean_style=False):
 class Generic_WSI_Classification_Dataset(Dataset):
 	def __init__(self,
 		csv_path = 'dataset_csv/ccrcc_clean.csv',
-		shuffle = False, 
-		seed = 7, 
+		shuffle = False,
+		seed = 7,
 		print_info = True,
 		label_dict = {},
 		filter_dict = {},
@@ -79,18 +79,16 @@ class Generic_WSI_Classification_Dataset(Dataset):
 			self.summarize()
 
 	def cls_ids_prep(self):
-		# store ids corresponding each class at the patient or case level
-		self.patient_cls_ids = [[] for i in range(self.num_classes)]		
+		self.patient_cls_ids = [[] for i in range(self.num_classes)]
 		for i in range(self.num_classes):
 			self.patient_cls_ids[i] = np.where(self.patient_data['label'] == i)[0]
 
-		# store ids corresponding each class at the slide level
 		self.slide_cls_ids = [[] for i in range(self.num_classes)]
 		for i in range(self.num_classes):
 			self.slide_cls_ids[i] = np.where(self.slide_data['label'] == i)[0]
 
 	def patient_data_prep(self, patient_voting='max'):
-		patients = np.unique(np.array(self.slide_data['case_id'])) # get unique patients
+		patients = np.unique(np.array(self.slide_data['case_id']))
 		patient_labels = []
 		
 		for p in patients:
@@ -98,7 +96,7 @@ class Generic_WSI_Classification_Dataset(Dataset):
 			assert len(locations) > 0
 			label = self.slide_data['label'][locations].values
 			if patient_voting == 'max':
-				label = label.max() # get patient label (MIL convention)
+				label = label.max()
 			elif patient_voting == 'maj':
 				label = stats.mode(label)[0]
 			else:
@@ -124,7 +122,6 @@ class Generic_WSI_Classification_Dataset(Dataset):
 	def filter_df(self, df, filter_dict={}):
 		if len(filter_dict) > 0:
 			filter_mask = np.full(len(df), True, bool)
-			# assert 'label' not in filter_dict.keys()
 			for key, val in filter_dict.items():
 				mask = df[key].isin(val)
 				filter_mask = np.logical_and(filter_mask, mask)
@@ -134,7 +131,6 @@ class Generic_WSI_Classification_Dataset(Dataset):
 	def __len__(self):
 		if self.patient_strat:
 			return len(self.patient_data['case_id'])
-
 		else:
 			return len(self.slide_data)
 
@@ -149,8 +145,8 @@ class Generic_WSI_Classification_Dataset(Dataset):
 
 	def create_splits(self, k = 3, val_num = (25, 25), test_num = (40, 40), label_frac = 1.0, custom_test_ids = None):
 		settings = {
-					'n_splits' : k, 
-					'val_num' : val_num, 
+					'n_splits' : k,
+					'val_num' : val_num,
 					'test_num': test_num,
 					'label_frac': label_frac,
 					'seed': self.seed,
@@ -167,21 +163,17 @@ class Generic_WSI_Classification_Dataset(Dataset):
 	def set_splits(self,start_from=None):
 		if start_from:
 			ids = nth(self.split_gen, start_from)
-
 		else:
 			ids = next(self.split_gen)
 
 		if self.patient_strat:
-			slide_ids = [[] for i in range(len(ids))] 
-
-			for split in range(len(ids)): 
+			slide_ids = [[] for i in range(len(ids))]
+			for split in range(len(ids)):
 				for idx in ids[split]:
 					case_id = self.patient_data['case_id'][idx]
 					slide_indices = self.slide_data[self.slide_data['case_id'] == case_id].index.tolist()
 					slide_ids[split].extend(slide_indices)
-
 			self.train_ids, self.val_ids, self.test_ids = slide_ids[0], slide_ids[1], slide_ids[2]
-
 		else:
 			self.train_ids, self.val_ids, self.test_ids = ids
 
@@ -192,7 +184,9 @@ class Generic_WSI_Classification_Dataset(Dataset):
 		if len(split) > 0:
 			mask = self.slide_data['slide_id'].isin(split.tolist())
 			df_slice = self.slide_data[mask].reset_index(drop=True)
-			split = Generic_Split(df_slice, data_dir=self.data_dir, num_classes=self.num_classes)
+			split = Generic_Split(df_slice, data_dir=self.data_dir, num_classes=self.num_classes,
+								  tangle_feature_dir=getattr(self, 'tangle_feature_dir', None),
+								  tangle_embedding_dim=getattr(self, 'tangle_embedding_dim', 1024))
 		else:
 			split = None
 		
@@ -205,10 +199,12 @@ class Generic_WSI_Classification_Dataset(Dataset):
 			split = split.dropna().reset_index(drop=True).tolist()
 			merged_split.extend(split)
 
-		if len(split) > 0:
+		if len(merged_split) > 0:
 			mask = self.slide_data['slide_id'].isin(merged_split)
 			df_slice = self.slide_data[mask].reset_index(drop=True)
-			split = Generic_Split(df_slice, data_dir=self.data_dir, num_classes=self.num_classes)
+			split = Generic_Split(df_slice, data_dir=self.data_dir, num_classes=self.num_classes,
+								  tangle_feature_dir=getattr(self, 'tangle_feature_dir', None),
+								  tangle_embedding_dim=getattr(self, 'tangle_embedding_dim', 1024))
 		else:
 			split = None
 		
@@ -216,34 +212,31 @@ class Generic_WSI_Classification_Dataset(Dataset):
 
 
 	def return_splits(self, from_id=True, csv_path=None):
-
-
+		tangle_kwargs = {
+			"tangle_feature_dir": getattr(self, 'tangle_feature_dir', None),
+			"tangle_embedding_dim": getattr(self, 'tangle_embedding_dim', 1024)
+		}
 		if from_id:
 			if len(self.train_ids) > 0:
 				train_data = self.slide_data.loc[self.train_ids].reset_index(drop=True)
-				train_split = Generic_Split(train_data, data_dir=self.data_dir, num_classes=self.num_classes)
-
+				train_split = Generic_Split(train_data, data_dir=self.data_dir, num_classes=self.num_classes, **tangle_kwargs)
 			else:
 				train_split = None
 			
 			if len(self.val_ids) > 0:
 				val_data = self.slide_data.loc[self.val_ids].reset_index(drop=True)
-				val_split = Generic_Split(val_data, data_dir=self.data_dir, num_classes=self.num_classes)
-
+				val_split = Generic_Split(val_data, data_dir=self.data_dir, num_classes=self.num_classes, **tangle_kwargs)
 			else:
 				val_split = None
 			
 			if len(self.test_ids) > 0:
 				test_data = self.slide_data.loc[self.test_ids].reset_index(drop=True)
-				test_split = Generic_Split(test_data, data_dir=self.data_dir, num_classes=self.num_classes)
-			
+				test_split = Generic_Split(test_data, data_dir=self.data_dir, num_classes=self.num_classes, **tangle_kwargs)
 			else:
 				test_split = None
-			
-		
 		else:
-			assert csv_path 
-			all_splits = pd.read_csv(csv_path, dtype=self.slide_data['slide_id'].dtype)  # Without "dtype=self.slide_data['slide_id'].dtype", read_csv() will convert all-number columns to a numerical type. Even if we convert numerical columns back to objects later, we may lose zero-padding in the process; the columns must be correctly read in from the get-go. When we compare the individual train/val/test columns to self.slide_data['slide_id'] in the get_split_from_df() method, we cannot compare objects (strings) to numbers or even to incorrectly zero-padded objects/strings. An example of this breaking is shown in https://github.com/andrew-weisman/clam_analysis/tree/main/datatype_comparison_bug-2021-12-01.
+			assert csv_path
+			all_splits = pd.read_csv(csv_path, dtype=self.slide_data['slide_id'].dtype)
 			train_split = self.get_split_from_df(all_splits, 'train')
 			val_split = self.get_split_from_df(all_splits, 'val')
 			test_split = self.get_split_from_df(all_splits, 'test')
@@ -259,48 +252,6 @@ class Generic_WSI_Classification_Dataset(Dataset):
 	def __getitem__(self, idx):
 		return None
 
-	def test_split_gen(self, return_descriptor=False):
-
-		if return_descriptor:
-			index = [list(self.label_dict.keys())[list(self.label_dict.values()).index(i)] for i in range(self.num_classes)]
-			columns = ['train', 'val', 'test']
-			df = pd.DataFrame(np.full((len(index), len(columns)), 0, dtype=np.int32), index= index,
-							columns= columns)
-
-		count = len(self.train_ids)
-		print('\nnumber of training samples: {}'.format(count))
-		labels = self.getlabel(self.train_ids)
-		unique, counts = np.unique(labels, return_counts=True)
-		for u in range(len(unique)):
-			print('number of samples in cls {}: {}'.format(unique[u], counts[u]))
-			if return_descriptor:
-				df.loc[index[u], 'train'] = counts[u]
-		
-		count = len(self.val_ids)
-		print('\nnumber of val samples: {}'.format(count))
-		labels = self.getlabel(self.val_ids)
-		unique, counts = np.unique(labels, return_counts=True)
-		for u in range(len(unique)):
-			print('number of samples in cls {}: {}'.format(unique[u], counts[u]))
-			if return_descriptor:
-				df.loc[index[u], 'val'] = counts[u]
-
-		count = len(self.test_ids)
-		print('\nnumber of test samples: {}'.format(count))
-		labels = self.getlabel(self.test_ids)
-		unique, counts = np.unique(labels, return_counts=True)
-		for u in range(len(unique)):
-			print('number of samples in cls {}: {}'.format(unique[u], counts[u]))
-			if return_descriptor:
-				df.loc[index[u], 'test'] = counts[u]
-
-		assert len(np.intersect1d(self.train_ids, self.test_ids)) == 0
-		assert len(np.intersect1d(self.train_ids, self.val_ids)) == 0
-		assert len(np.intersect1d(self.val_ids, self.test_ids)) == 0
-
-		if return_descriptor:
-			return df
-
 	def save_split(self, filename):
 		train_split = self.get_list(self.train_ids)
 		val_split = self.get_list(self.val_ids)
@@ -308,13 +259,13 @@ class Generic_WSI_Classification_Dataset(Dataset):
 		df_tr = pd.DataFrame({'train': train_split})
 		df_v = pd.DataFrame({'val': val_split})
 		df_t = pd.DataFrame({'test': test_split})
-		df = pd.concat([df_tr, df_v, df_t], axis=1) 
+		df = pd.concat([df_tr, df_v, df_t], axis=1)
 		df.to_csv(filename, index = False)
 
 
 class Generic_MIL_Dataset(Generic_WSI_Classification_Dataset):
 	def __init__(self,
-		data_dir, 
+		data_dir,
 		**kwargs):
 	
 		super(Generic_MIL_Dataset, self).__init__(**kwargs)
@@ -338,10 +289,8 @@ class Generic_MIL_Dataset(Generic_WSI_Classification_Dataset):
 				full_path = os.path.join(data_dir, 'pt_files', '{}.pt'.format(slide_id))
 				features = torch.load(full_path)
 				return features, label
-			
 			else:
 				return slide_id, label
-
 		else:
 			full_path = os.path.join(data_dir,'h5_files','{}.h5'.format(slide_id))
 			with h5py.File(full_path,'r') as hdf5_file:
@@ -352,38 +301,68 @@ class Generic_MIL_Dataset(Generic_WSI_Classification_Dataset):
 			return features, label, coords
 
 class Generic_MIL_Dataset_Tangle(Generic_MIL_Dataset):
-    def __init__(self, tangle_feature_dir=None, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.tangle_feature_dir = tangle_feature_dir
+	def __init__(self, tangle_feature_dir=None, tangle_embedding_dim=1024, *args, **kwargs):
+		super().__init__(*args, **kwargs)
+		self.tangle_feature_dir = tangle_feature_dir
+		self.tangle_embedding_dim = tangle_embedding_dim
 
-    def __getitem__(self, idx):
-        patch_features, label = super().__getitem__(idx)  # Returns patch tensor, label
-        slide_id = self.slide_data['slide_id'][idx]
+	def __getitem__(self, idx):
+		patch_features, label = super().__getitem__(idx)
+		slide_id = self.slide_data['slide_id'][idx]
 
-        tangle_features = None
-        if self.tangle_feature_dir is not None:
-            tangle_path = os.path.join(self.tangle_feature_dir, f"{slide_id}.npy")
-            if os.path.isfile(tangle_path):
-                tangle_features = torch.from_numpy(np.load(tangle_path)).float()
-            else:
-                # Use zeros if missing (adjust 1024 if needed)
-                tangle_features = torch.zeros(1024) 
+		tangle_features = None
+		if self.tangle_feature_dir is not None:
+			tangle_path = os.path.join(self.tangle_feature_dir, f"{slide_id}.npy")
+			if os.path.isfile(tangle_path):
+				tangle_features = torch.from_numpy(np.load(tangle_path)).float()
+			else:
+				tangle_features = torch.zeros(self.tangle_embedding_dim)
+		
+		return patch_features, label, tangle_features, slide_id
 
-        return patch_features, label, tangle_features, slide_id
 
-
-class Generic_Split(Generic_MIL_Dataset):
-	def __init__(self, slide_data, data_dir=None, num_classes=2):
+class Generic_Split(Dataset):
+	def __init__(self, slide_data, data_dir=None, num_classes=2,
+				 tangle_feature_dir=None, tangle_embedding_dim=1024):
 		self.use_h5 = False
 		self.slide_data = slide_data
 		self.data_dir = data_dir
 		self.num_classes = num_classes
+		self.tangle_feature_dir = tangle_feature_dir
+		self.tangle_embedding_dim = tangle_embedding_dim
 		self.slide_cls_ids = [[] for i in range(self.num_classes)]
 		for i in range(self.num_classes):
 			self.slide_cls_ids[i] = np.where(self.slide_data['label'] == i)[0]
 
 	def __len__(self):
 		return len(self.slide_data)
+
+	def __getitem__(self, idx):
+		slide_id = self.slide_data['slide_id'][idx]
+		label = self.slide_data['label'][idx]
 		
+		# Load patch features
+		if type(self.data_dir) == dict:
+			source = self.slide_data['source'][idx]
+			data_dir = self.data_dir[source]
+		else:
+			data_dir = self.data_dir
+		
+		if self.data_dir:
+			full_path = os.path.join(data_dir, 'pt_files', '{}.pt'.format(slide_id))
+			patch_features = torch.load(full_path)
+		else:
+			# Fallback if data_dir is not provided, though not expected in this workflow
+			patch_features = torch.empty(0)
 
+		# Load tangle features
+		tangle_features = None
+		if self.tangle_feature_dir is not None:
+			tangle_path = os.path.join(self.tangle_feature_dir, f"{slide_id}.npy")
+			if os.path.isfile(tangle_path):
+				tangle_features = torch.from_numpy(np.load(tangle_path)).float()
+			else:
+				# Use zeros if missing
+				tangle_features = torch.zeros(self.tangle_embedding_dim)
 
+		return patch_features, label, tangle_features, slide_id

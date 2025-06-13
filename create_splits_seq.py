@@ -22,7 +22,7 @@ args = parser.parse_args()
 
 if args.task == 'task_1_tumor_vs_normal':
     args.n_classes=2
-    dataset = Generic_WSI_Classification_Dataset(csv_path = 'C:/Users/Mahon/OneDrive/Documents/CLAM/Labels/Textual/labels_ims1_filtered.csv',
+    dataset = Generic_WSI_Classification_Dataset(csv_path = 'C:/Users/Mahon/Documents/Research/CLAM/Labels/Tangle/labels_ims1_filtered_cohort.csv',
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,

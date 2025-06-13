@@ -2,20 +2,18 @@ import numpy as np
 import torch
 from utils.utils import *
 import os
-from dataset_modules.dataset_generic import save_splits
+from dataset_modules.dataset_generic_tangle import save_splits
 from models.model_mil import MIL_fc, MIL_fc_mc
-from models.model_clam import CLAM_MB, CLAM_SB
+from models.model_clam_tangle import CLAM_MB_Tangle, CLAM_SB_Tangle
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.metrics import auc as calc_auc
 
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
 def tangle_collate(batch):
-        features, labels, tangle_feats, slide_ids = zip(*batch)
-        return list(features), torch.tensor(labels), list(tangle_feats), list(slide_ids)
-
+    features, labels, tangle_feats, slide_ids = zip(*batch)
+    return list(features), torch.tensor(labels), list(tangle_feats), list(slide_ids)
 
 class Accuracy_Logger(object):
     """Accuracy logger"""
@@ -153,9 +151,9 @@ def train(datasets, cur, args):
             instance_loss_fn = nn.CrossEntropyLoss()
         
         if args.model_type =='clam_sb':
-            model = CLAM_SB(**model_dict, instance_loss_fn=instance_loss_fn)
+            model = CLAM_SB_Tangle(**model_dict, instance_loss_fn=instance_loss_fn)
         elif args.model_type == 'clam_mb':
-            model = CLAM_MB(**model_dict, instance_loss_fn=instance_loss_fn)
+            model = CLAM_MB_Tangle(**model_dict, instance_loss_fn=instance_loss_fn)
         else:
             raise NotImplementedError
     
@@ -176,9 +174,12 @@ def train(datasets, cur, args):
     print('\nInit Loaders...', end=' ')
     from torch.utils.data import DataLoader
 
-    train_loader = DataLoader(train_split, batch_size=1, shuffle=True, collate_fn=tangle_collate)
-    val_loader = DataLoader(val_split, batch_size=1, shuffle=False, collate_fn=tangle_collate)
-    test_loader = DataLoader(test_split, batch_size=1, shuffle=False, collate_fn=tangle_collate)
+    # Use tangle_collate only if tangle concatenation is enabled
+    collate_fn = tangle_collate if args.use_tangle_concatenation else None
+
+    train_loader = DataLoader(train_split, batch_size=1, shuffle=True, collate_fn=collate_fn)
+    val_loader = DataLoader(val_split, batch_size=1, shuffle=False, collate_fn=collate_fn)
+    test_loader = DataLoader(test_split, batch_size=1, shuffle=False, collate_fn=collate_fn)
     print('Done!')
 
     print('\nSetup EarlyStopping...', end=' ')
@@ -191,14 +192,14 @@ def train(datasets, cur, args):
 
     for epoch in range(args.max_epochs):
         if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:     
-            train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn)
+            train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn, args.use_tangle_concatenation)
             stop = validate_clam(cur, epoch, model, val_loader, args.n_classes, 
-                early_stopping, writer, loss_fn, args.results_dir)
+                early_stopping, writer, loss_fn, args.results_dir, args.use_tangle_concatenation)
         
         else:
-            train_loop(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn)
+            train_loop(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn, args.use_tangle_concatenation)
             stop = validate(cur, epoch, model, val_loader, args.n_classes, 
-                early_stopping, writer, loss_fn, args.results_dir)
+                early_stopping, writer, loss_fn, args.results_dir, args.use_tangle_concatenation)
         
         if stop: 
             break
@@ -208,10 +209,10 @@ def train(datasets, cur, args):
     else:
         torch.save(model.state_dict(), os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur)))
 
-    _, val_error, val_auc, _= summary(model, val_loader, args.n_classes)
+    _, val_error, val_auc, _= summary(model, val_loader, args.n_classes, args.use_tangle_concatenation)
     print('Val error: {:.4f}, ROC AUC: {:.4f}'.format(val_error, val_auc))
 
-    results_dict, test_error, test_auc, acc_logger = summary(model, test_loader, args.n_classes)
+    results_dict, test_error, test_auc, acc_logger = summary(model, test_loader, args.n_classes, args.use_tangle_concatenation)
     print('Test error: {:.4f}, ROC AUC: {:.4f}'.format(test_error, test_auc))
 
     for i in range(args.n_classes):
@@ -230,7 +231,7 @@ def train(datasets, cur, args):
     return results_dict, test_auc, val_auc, 1-test_error, 1-val_error 
 
 
-def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writer = None, loss_fn = None):
+def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writer = None, loss_fn = None, use_tangle=False):
     model.train()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
     inst_logger = Accuracy_Logger(n_classes=n_classes)
@@ -241,9 +242,19 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
     inst_count = 0
 
     print('\n')
-    for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
-        data, label = data.to(device), label.to(device)
-        logits, Y_prob, Y_hat, _, instance_dict = model(data, tangle_feat=tangle_feat, label=label, instance_eval=True)
+    for batch_idx, batch in enumerate(loader):
+        if use_tangle:
+            data_list, label, tangle_feat_list, slide_id = batch
+            data = data_list[0].to(device)
+            tangle_feat = tangle_feat_list[0].to(device) if tangle_feat_list and tangle_feat_list[0] is not None else None
+        else:
+            data, label = batch
+            data = data[0].to(device)
+            tangle_feat = None
+        
+        label = label.to(device)
+        
+        logits, Y_prob, Y_hat, _, instance_dict = model(h=data, tangle_feat=tangle_feat, label=label, instance_eval=True)
 
         acc_logger.log(Y_hat, label)
         loss = loss_fn(logits, label)
@@ -297,15 +308,23 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
         writer.add_scalar('train/error', train_error, epoch)
         writer.add_scalar('train/clustering_loss', train_inst_loss, epoch)
 
-def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_fn = None):   
+def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_fn = None, use_tangle=False):   
     model.train()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
     train_loss = 0.
     train_error = 0.
 
     print('\n')
-    for  batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
-        data, label = data.to(device), label.to(device)
+    for batch_idx, batch in enumerate(loader):
+        if use_tangle:
+            data_list, label, _, _ = batch
+            data = data_list[0].to(device)
+            # This loop is for non-CLAM models, tangle_feat not used, but passed for consistency
+        else:
+            data, label = batch
+            data = data[0].to(device)
+
+        label = label.to(device)
 
         logits, Y_prob, Y_hat, _, _ = model(data)
         
@@ -342,10 +361,9 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_f
         writer.add_scalar('train/error', train_error, epoch)
 
    
-def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir=None):
+def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir=None, use_tangle=False):
     model.eval()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
-    # loader.dataset.update_mode(True)
     val_loss = 0.
     val_error = 0.
     
@@ -353,9 +371,16 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer
     labels = np.zeros(len(loader))
 
     with torch.no_grad():
-        for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
-            data, label = data.to(device, non_blocking=True), label.to(device, non_blocking=True)
-
+        for batch_idx, batch in enumerate(loader):
+            if use_tangle:
+                data_list, label, _, _ = batch
+                data = data_list[0].to(device, non_blocking=True)
+            else:
+                data, label = batch
+                data = data[0].to(device, non_blocking=True)
+            
+            label = label.to(device, non_blocking=True)
+            
             logits, Y_prob, Y_hat, _, _ = model(data)
 
             acc_logger.log(Y_hat, label)
@@ -369,16 +394,13 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer
             error = calculate_error(Y_hat, label)
             val_error += error
             
-
     val_error /= len(loader)
     val_loss /= len(loader)
 
     if n_classes == 2:
         auc = roc_auc_score(labels, prob[:, 1])
-    
     else:
         auc = roc_auc_score(labels, prob, multi_class='ovr')
-    
     
     if writer:
         writer.add_scalar('val/loss', val_loss, epoch)
@@ -400,7 +422,7 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer
 
     return False
 
-def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir = None):
+def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir = None, use_tangle=False):
     model.eval()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
     inst_logger = Accuracy_Logger(n_classes=n_classes)
@@ -408,27 +430,33 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
     val_error = 0.
 
     val_inst_loss = 0.
-    val_inst_acc = 0.
     inst_count=0
     
     prob = np.zeros((len(loader), n_classes))
     labels = np.zeros(len(loader))
-    sample_size = model.k_sample
+
     with torch.inference_mode():
-        for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
-            data, label = data.to(device), label.to(device)      
-            logits, Y_prob, Y_hat, _, instance_dict = model(data, tangle_feat=tangle_feat, label=label, instance_eval=True)
+        for batch_idx, batch in enumerate(loader):
+            if use_tangle:
+                data_list, label, tangle_feat_list, _ = batch
+                data = data_list[0].to(device)
+                tangle_feat = tangle_feat_list[0].to(device) if tangle_feat_list and tangle_feat_list[0] is not None else None
+            else:
+                data, label = batch
+                data = data[0].to(device)
+                tangle_feat = None
+            
+            label = label.to(device)
+            
+            logits, Y_prob, Y_hat, _, instance_dict = model(h=data, tangle_feat=tangle_feat, label=label, instance_eval=True)
             acc_logger.log(Y_hat, label)
             
             loss = loss_fn(logits, label)
-
             val_loss += loss.item()
-
             instance_loss = instance_dict['instance_loss']
             
             inst_count+=1
-            instance_loss_value = instance_loss.item()
-            val_inst_loss += instance_loss_value
+            val_inst_loss += instance_loss.item()
 
             inst_preds = instance_dict['inst_preds']
             inst_labels = instance_dict['inst_labels']
@@ -445,17 +473,15 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
 
     if n_classes == 2:
         auc = roc_auc_score(labels, prob[:, 1])
-        aucs = []
     else:
-        aucs = []
         binary_labels = label_binarize(labels, classes=[i for i in range(n_classes)])
+        aucs = []
         for class_idx in range(n_classes):
             if class_idx in labels:
                 fpr, tpr, _ = roc_curve(binary_labels[:, class_idx], prob[:, class_idx])
                 aucs.append(calc_auc(fpr, tpr))
             else:
                 aucs.append(float('nan'))
-
         auc = np.nanmean(np.array(aucs))
 
     print('\nVal Set, val_loss: {:.4f}, val_error: {:.4f}, auc: {:.4f}'.format(val_loss, val_error, auc))
@@ -471,7 +497,6 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
         writer.add_scalar('val/error', val_error, epoch)
         writer.add_scalar('val/inst_loss', val_inst_loss, epoch)
 
-
     for i in range(n_classes):
         acc, correct, count = acc_logger.get_summary(i)
         print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
@@ -479,7 +504,6 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
         if writer and acc is not None:
             writer.add_scalar('val/class_{}_acc'.format(i), acc, epoch)
      
-
     if early_stopping:
         assert results_dir
         early_stopping(epoch, val_loss, model, ckpt_name = os.path.join(results_dir, "s_{}_checkpoint.pt".format(cur)))
@@ -490,10 +514,9 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
 
     return False
 
-def summary(model, loader, n_classes):
+def summary(model, loader, n_classes, use_tangle=False):
     acc_logger = Accuracy_Logger(n_classes=n_classes)
     model.eval()
-    test_loss = 0.
     test_error = 0.
 
     all_probs = np.zeros((len(loader), n_classes))
@@ -502,11 +525,21 @@ def summary(model, loader, n_classes):
     slide_ids = loader.dataset.slide_data['slide_id']
     patient_results = {}
 
-    for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
-        data, label = data.to(device), label.to(device)
-        slide_id = slide_ids.iloc[batch_idx]
+    for batch_idx, batch in enumerate(loader):
+        if use_tangle:
+            data_list, label, tangle_feat_list, slide_id_list = batch
+            data = data_list[0].to(device)
+            tangle_feat = tangle_feat_list[0].to(device) if tangle_feat_list and tangle_feat_list[0] is not None else None
+            slide_id = slide_id_list[0]
+        else:
+            data, label, slide_id = batch # Assuming slide_id is returned by non-tangle dataset too
+            data = data[0].to(device)
+            tangle_feat = None
+        
+        label = label.to(device)
+        
         with torch.inference_mode():
-            logits, Y_prob, Y_hat, _, _ = model(data)
+            logits, Y_prob, Y_hat, _, _ = model(h=data, tangle_feat=tangle_feat, label=label, instance_eval=False)
 
         acc_logger.log(Y_hat, label)
         probs = Y_prob.cpu().numpy()
@@ -521,18 +554,15 @@ def summary(model, loader, n_classes):
 
     if n_classes == 2:
         auc = roc_auc_score(all_labels, all_probs[:, 1])
-        aucs = []
     else:
-        aucs = []
         binary_labels = label_binarize(all_labels, classes=[i for i in range(n_classes)])
+        aucs = []
         for class_idx in range(n_classes):
             if class_idx in all_labels:
                 fpr, tpr, _ = roc_curve(binary_labels[:, class_idx], all_probs[:, class_idx])
                 aucs.append(calc_auc(fpr, tpr))
             else:
                 aucs.append(float('nan'))
-
         auc = np.nanmean(np.array(aucs))
-
 
     return patient_results, test_error, auc, acc_logger

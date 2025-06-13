@@ -8,8 +8,8 @@ import math
 # internal imports
 from utils.file_utils import save_pkl, load_pkl
 from utils.utils import *
-from utils.core_utils import train
-from dataset_modules.dataset_generic import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset_Tangle
+from utils.core_utils_tangle import train
+from dataset_modules.dataset_generic_tangle import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset_Tangle
 
 # pytorch imports
 import torch
@@ -65,10 +65,11 @@ def main(args):
     final_df.to_csv(os.path.join(args.results_dir, save_name))
 
 # Generic training settings
-parser = argparse.ArgumentParser(description='Configurations for WSI Training')
+parser = argparse.ArgumentParser(description='Configurations for WSI Training with Tangle Embeddings')
 parser.add_argument('--data_root_dir', type=str, default=None, 
-                    help='data directory')
-parser.add_argument('--embed_dim', type=int, default=1024)
+                    help='data directory for patch features')
+parser.add_argument('--embed_dim', type=int, default=1024,
+                    help='dimension of base patch features (default: 1024)')
 parser.add_argument('--max_epochs', type=int, default=200,
                     help='maximum number of epochs to train (default: 200)')
 parser.add_argument('--lr', type=float, default=1e-4,
@@ -84,8 +85,7 @@ parser.add_argument('--k_start', type=int, default=-1, help='start fold (default
 parser.add_argument('--k_end', type=int, default=-1, help='end fold (default: -1, first fold)')
 parser.add_argument('--results_dir', default='./results', help='results directory (default: ./results)')
 parser.add_argument('--split_dir', type=str, default=None, 
-                    help='manually specify the set of splits to use, ' 
-                    +'instead of infering from the task and label_frac argument (default: None)')
+                    help='manually specify the set of splits to use')
 parser.add_argument('--log_data', action='store_true', default=False, help='log data using tensorboard')
 parser.add_argument('--testing', action='store_true', default=False, help='debugging tool')
 parser.add_argument('--early_stopping', action='store_true', default=False, help='enable early stopping')
@@ -99,6 +99,15 @@ parser.add_argument('--exp_code', type=str, help='experiment code for saving res
 parser.add_argument('--weighted_sample', action='store_true', default=False, help='enable weighted sampling')
 parser.add_argument('--model_size', type=str, choices=['small', 'big'], default='small', help='size of model, does not affect mil')
 parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'task_2_tumor_subtyping'])
+
+# Tangle-specific options
+parser.add_argument('--use_tangle_concatenation', action='store_true', default=False,
+                     help='Enable concatenation of Tangle embeddings with patch features.')
+parser.add_argument('--tangle_feature_dir', type=str, default=None,
+                     help='Directory containing Tangle embedding .npy files.')
+parser.add_argument('--tangle_embedding_dim', type=int, default=1024,
+                     help='Dimension of the Tangle embeddings (default: 1024).')
+
 ### CLAM specific options
 parser.add_argument('--no_inst_cluster', action='store_true', default=False,
                      help='disable instance-level clustering')
@@ -126,7 +135,23 @@ def seed_torch(seed=7):
 
 seed_torch(args.seed)
 
-encoding_size = 1024
+# Handle Tangle feature concatenation
+if args.use_tangle_concatenation:
+    print("Tangle embedding concatenation enabled.")
+    assert args.tangle_feature_dir is not None, "A directory for Tangle features must be specified via --tangle_feature_dir"
+    print(f"Original feature dim: {args.embed_dim}")
+    print(f"Tangle feature dim: {args.tangle_embedding_dim}")
+    # Update the embedding dimension for the model
+    args.embed_dim += args.tangle_embedding_dim
+    print(f"Combined feature dim for model: {args.embed_dim}")
+    tangle_kwargs = {
+        "tangle_feature_dir": args.tangle_feature_dir,
+        "tangle_embedding_dim": args.tangle_embedding_dim
+    }
+else:
+    tangle_kwargs = {"tangle_feature_dir": None}
+
+
 settings = {'num_splits': args.k, 
             'k_start': args.k_start,
             'k_end': args.k_end,
@@ -143,7 +168,10 @@ settings = {'num_splits': args.k,
             'model_size': args.model_size,
             "use_drop_out": args.drop_out,
             'weighted_sample': args.weighted_sample,
-            'opt': args.opt}
+            'opt': args.opt,
+            'use_tangle_concatenation': args.use_tangle_concatenation,
+            'tangle_feature_dir': args.tangle_feature_dir,
+            'embed_dim': args.embed_dim}
 
 if args.model_type in ['clam_sb', 'clam_mb']:
    settings.update({'bag_weight': args.bag_weight,
@@ -154,25 +182,27 @@ print('\nLoad Dataset')
 
 if args.task == 'task_1_tumor_vs_normal':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = 'C:/Users/Mahon/OneDrive/Documents/CLAM/Labels/Textual/labels_ims2_filtered.csv',
+    dataset = Generic_MIL_Dataset_Tangle(csv_path = 'C:/Users/Mahon/Documents/Research/CLAM/Labels/Tangle/labels_ims1_filtered_cohort.csv', # CUSTOMIZE
                             data_dir= args.data_root_dir,
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
                             label_dict = {'normal_tissue':0, 'tumor_tissue':1},
                             patient_strat=False,
-                            ignore=[])
+                            ignore=[],
+                            **tangle_kwargs)
 
 elif args.task == 'task_2_tumor_subtyping':
     args.n_classes=3
-    dataset = Generic_MIL_Dataset(csv_path = 'dataset_csv/tumor_subtyping_dummy_clean.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'tumor_subtyping_resnet_features'),
+    dataset = Generic_MIL_Dataset_Tangle(csv_path = 'path/to/your/subtyping_labels.csv', # CUSTOMIZE
+                            data_dir= args.data_root_dir,
                             shuffle = False, 
                             seed = args.seed, 
                             print_info = True,
                             label_dict = {'subtype_1':0, 'subtype_2':1, 'subtype_3':2},
                             patient_strat= False,
-                            ignore=[])
+                            ignore=[],
+                            **tangle_kwargs)
 
     if args.model_type in ['clam_sb', 'clam_mb']:
         assert args.subtyping 
@@ -210,5 +240,3 @@ if __name__ == "__main__":
     results = main(args)
     print("finished!")
     print("end script")
-
-

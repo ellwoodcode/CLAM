@@ -1,38 +1,36 @@
 import numpy as np
 import torch
-from utils.utils import *
+import torch.nn as nn # Added for loss_fn
+from utils.utils import * # Assuming these utils are general
 import os
-from dataset_modules.dataset_generic import save_splits
-from models.model_mil import MIL_fc, MIL_fc_mc
-from models.model_clam import CLAM_MB, CLAM_SB
+# Assuming dataset_generic_rna.py is in a directory accessible by PYTHONPATH, or relative import
+# For example, if dataset_generic_rna is in dataset_modules:
+from dataset_modules.dataset_generic_rna import save_splits
+# Import RNA models
+from models.model_mil import MIL_fc, MIL_fc_mc # Assuming these are still used for 'mil' type
+from models.model_clam_rna import CLAM_MB_RNA, CLAM_SB_RNA
 from sklearn.preprocessing import label_binarize
 from sklearn.metrics import roc_auc_score, roc_curve
 from sklearn.metrics import auc as calc_auc
 
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-def tangle_collate(batch):
-        features, labels, tangle_feats, slide_ids = zip(*batch)
-        return list(features), torch.tensor(labels), list(tangle_feats), list(slide_ids)
-
-
 class Accuracy_Logger(object):
     """Accuracy logger"""
     def __init__(self, n_classes):
-        super().__init__()
+        super(Accuracy_Logger, self).__init__() # Corrected super call
         self.n_classes = n_classes
         self.initialize()
 
     def initialize(self):
         self.data = [{"count": 0, "correct": 0} for i in range(self.n_classes)]
-    
+
     def log(self, Y_hat, Y):
         Y_hat = int(Y_hat)
         Y = int(Y)
         self.data[Y]["count"] += 1
         self.data[Y]["correct"] += (Y_hat == Y)
-    
+
     def log_batch(self, Y_hat, Y):
         Y_hat = np.array(Y_hat).astype(int)
         Y = np.array(Y).astype(int)
@@ -40,16 +38,16 @@ class Accuracy_Logger(object):
             cls_mask = Y == label_class
             self.data[label_class]["count"] += cls_mask.sum()
             self.data[label_class]["correct"] += (Y_hat[cls_mask] == Y[cls_mask]).sum()
-    
+
     def get_summary(self, c):
-        count = self.data[c]["count"] 
+        count = self.data[c]["count"]
         correct = self.data[c]["correct"]
-        
-        if count == 0: 
+
+        if count == 0:
             acc = None
         else:
             acc = float(correct) / count
-        
+
         return acc, correct, count
 
 class EarlyStopping:
@@ -60,7 +58,7 @@ class EarlyStopping:
             patience (int): How long to wait after last time validation loss improved.
                             Default: 20
             stop_epoch (int): Earliest epoch possible for stopping
-            verbose (bool): If True, prints a message for each validation loss improvement. 
+            verbose (bool): If True, prints a message for each validation loss improvement.
                             Default: False
         """
         self.patience = patience
@@ -72,9 +70,7 @@ class EarlyStopping:
         self.val_loss_min = np.Inf
 
     def __call__(self, epoch, val_loss, model, ckpt_name = 'checkpoint.pt'):
-
         score = -val_loss
-
         if self.best_score is None:
             self.best_score = score
             self.save_checkpoint(val_loss, model, ckpt_name)
@@ -92,12 +88,17 @@ class EarlyStopping:
         '''Saves model when validation loss decrease.'''
         if self.verbose:
             print(f'Validation loss decreased ({self.val_loss_min:.6f} --> {val_loss:.6f}).  Saving model ...')
+        # Ensure ckpt_name directory exists
+        ckpt_dir = os.path.dirname(ckpt_name)
+        if ckpt_dir and not os.path.exists(ckpt_dir):
+            os.makedirs(ckpt_dir, exist_ok=True)
         torch.save(model.state_dict(), ckpt_name)
         self.val_loss_min = val_loss
 
-def train(datasets, cur, args):
-    """   
-        train for a single fold
+# Renamed to train_rna
+def train_rna(datasets, cur, args):
+    """
+        train for a single fold with RNA data consideration
     """
     print('\nTraining Fold {}!'.format(cur))
     writer_dir = os.path.join(args.results_dir, str(cur))
@@ -105,120 +106,130 @@ def train(datasets, cur, args):
         os.mkdir(writer_dir)
 
     if args.log_data:
-        from tensorboardX import SummaryWriter
+        from tensorboardX import SummaryWriter # Keep or use torch.utils.tensorboard
         writer = SummaryWriter(writer_dir, flush_secs=15)
-
     else:
         writer = None
 
     print('\nInit train/val/test splits...', end=' ')
     train_split, val_split, test_split = datasets
+    # save_splits is imported from dataset_generic_rna, should be fine
     save_splits(datasets, ['train', 'val', 'test'], os.path.join(args.results_dir, 'splits_{}.csv'.format(cur)))
     print('Done!')
-    print("Training on {} samples".format(len(train_split)))
-    print("Validating on {} samples".format(len(val_split)))
-    print("Testing on {} samples".format(len(test_split)))
+    print("Training on {} samples".format(len(train_split) if train_split else 0))
+    print("Validating on {} samples".format(len(val_split) if val_split else 0))
+    print("Testing on {} samples".format(len(test_split) if test_split else 0))
+
 
     print('\nInit loss function...', end=' ')
     if args.bag_loss == 'svm':
-        from topk.svm import SmoothTop1SVM
+        from topk.svm import SmoothTop1SVM # Assuming topk.svm is available
         loss_fn = SmoothTop1SVM(n_classes = args.n_classes)
         if device.type == 'cuda':
             loss_fn = loss_fn.cuda()
     else:
         loss_fn = nn.CrossEntropyLoss()
     print('Done!')
-    
+
     print('\nInit Model...', end=' ')
-    model_dict = {"dropout": args.drop_out, 
-                  'n_classes': args.n_classes, 
-                  "embed_dim": args.embed_dim}
-    
+    # embed_dim is now the concatenated dimension if use_rna_concatenation is True
+    # It will be calculated in main_rna.py and passed via args.embed_dim
+    model_dict = {"dropout": args.drop_out,
+                  'n_classes': args.n_classes,
+                  "embed_dim": args.embed_dim} # This embed_dim comes from args
+
     if args.model_size is not None and args.model_type != 'mil':
         model_dict.update({"size_arg": args.model_size})
-    
+
     if args.model_type in ['clam_sb', 'clam_mb']:
         if args.subtyping:
             model_dict.update({'subtyping': True})
-        
-        if args.B > 0:
+
+        if args.B > 0: # args.B is num positive/negative patches for CLAM
             model_dict.update({'k_sample': args.B})
-        
+
         if args.inst_loss == 'svm':
             from topk.svm import SmoothTop1SVM
-            instance_loss_fn = SmoothTop1SVM(n_classes = 2)
+            instance_loss_fn = SmoothTop1SVM(n_classes = 2) # Instance is binary
             if device.type == 'cuda':
                 instance_loss_fn = instance_loss_fn.cuda()
+        elif args.inst_loss == 'ce':
+             instance_loss_fn = nn.CrossEntropyLoss()
         else:
-            instance_loss_fn = nn.CrossEntropyLoss()
-        
+            instance_loss_fn = None # Or handle as an error if it must be set
+
         if args.model_type =='clam_sb':
-            model = CLAM_SB(**model_dict, instance_loss_fn=instance_loss_fn)
+            model = CLAM_SB_RNA(**model_dict, instance_loss_fn=instance_loss_fn)
         elif args.model_type == 'clam_mb':
-            model = CLAM_MB(**model_dict, instance_loss_fn=instance_loss_fn)
+            model = CLAM_MB_RNA(**model_dict, instance_loss_fn=instance_loss_fn)
         else:
             raise NotImplementedError
-    
-    else: # args.model_type == 'mil'
+
+    elif args.model_type == 'mil': # Assuming MIL models don't need RNA specific changes for now or handled by embed_dim
         if args.n_classes > 2:
             model = MIL_fc_mc(**model_dict)
         else:
             model = MIL_fc(**model_dict)
-    
-    _ = model.to(device)
+    else:
+        raise NotImplementedError
+
+    model = model.to(device) # Moved this line after model initialization
     print('Done!')
-    print_network(model)
+    # print_network(model) # Assuming print_network is a general util
 
     print('\nInit optimizer ...', end=' ')
-    optimizer = get_optim(model, args)
+    optimizer = get_optim(model, args) # Assuming get_optim is a general util
     print('Done!')
-    
-    print('\nInit Loaders...', end=' ')
-    from torch.utils.data import DataLoader
 
-    train_loader = DataLoader(train_split, batch_size=1, shuffle=True, collate_fn=tangle_collate)
-    val_loader = DataLoader(val_split, batch_size=1, shuffle=False, collate_fn=tangle_collate)
-    test_loader = DataLoader(test_split, batch_size=1, shuffle=False, collate_fn=tangle_collate)
+    print('\nInit Loaders...', end=' ')
+    # get_split_loader needs to handle the new dataset structure (concatenated features)
+    # but the loader itself might not need changes if the dataset __getitem__ returns (data, label)
+    train_loader = get_split_loader(train_split, training=True, testing = args.testing, weighted = args.weighted_sample)
+    val_loader = get_split_loader(val_split,  testing = args.testing)
+    test_loader = get_split_loader(test_split, testing = args.testing)
     print('Done!')
 
     print('\nSetup EarlyStopping...', end=' ')
     if args.early_stopping:
-        early_stopping = EarlyStopping(patience = 20, stop_epoch=50, verbose = True)
-
+        early_stopping = EarlyStopping(patience = args.early_stopping_patience if hasattr(args, 'early_stopping_patience') else 20, # more robust
+                                       stop_epoch= args.early_stopping_stop_epoch if hasattr(args, 'early_stopping_stop_epoch') else 50, # more robust
+                                       verbose = True)
     else:
         early_stopping = None
     print('Done!')
 
     for epoch in range(args.max_epochs):
-        if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:     
-            train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn)
-            stop = validate_clam(cur, epoch, model, val_loader, args.n_classes, 
+        # Training loops will use the CLAM models that expect concatenated features.
+        # No specific RNA loss is added here.
+        if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:
+            train_loop_clam_rna(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn, instance_loss_fn if args.inst_loss else None) # Pass instance_loss_fn
+            stop = validate_clam_rna(cur, epoch, model, val_loader, args.n_classes,
+                early_stopping, writer, loss_fn, args.results_dir, instance_loss_fn if args.inst_loss else None) # Pass instance_loss_fn
+        else: # MIL or CLAM without instance clustering
+            train_loop_rna(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn)
+            stop = validate_rna(cur, epoch, model, val_loader, args.n_classes,
                 early_stopping, writer, loss_fn, args.results_dir)
-        
-        else:
-            train_loop(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn)
-            stop = validate(cur, epoch, model, val_loader, args.n_classes, 
-                early_stopping, writer, loss_fn, args.results_dir)
-        
-        if stop: 
+
+        if stop:
             break
 
-    if args.early_stopping:
+    if args.early_stopping and early_stopping.best_score is not None: # ensure checkpoint was saved
         model.load_state_dict(torch.load(os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur))))
-    else:
+    else: # save last model if not early stopping or no best model found (e.g. immediate stop)
         torch.save(model.state_dict(), os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur)))
 
-    _, val_error, val_auc, _= summary(model, val_loader, args.n_classes)
+
+    _, val_error, val_auc, _ = summary_rna(model, val_loader, args.n_classes)
     print('Val error: {:.4f}, ROC AUC: {:.4f}'.format(val_error, val_auc))
 
-    results_dict, test_error, test_auc, acc_logger = summary(model, test_loader, args.n_classes)
+    results_dict, test_error, test_auc, acc_logger = summary_rna(model, test_loader, args.n_classes)
     print('Test error: {:.4f}, ROC AUC: {:.4f}'.format(test_error, test_auc))
 
     for i in range(args.n_classes):
         acc, correct, count = acc_logger.get_summary(i)
-        print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
+        print('class {}: acc {}, correct {}/{}'.format(i, acc if acc is not None else "N/A", correct, count)) # Handle acc is None
 
-        if writer:
+        if writer and acc is not None: # Add check for acc not None
             writer.add_scalar('final/test_class_{}_acc'.format(i), acc, 0)
 
     if writer:
@@ -227,47 +238,53 @@ def train(datasets, cur, args):
         writer.add_scalar('final/test_error', test_error, 0)
         writer.add_scalar('final/test_auc', test_auc, 0)
         writer.close()
-    return results_dict, test_auc, val_auc, 1-test_error, 1-val_error 
+    return results_dict, test_auc, val_auc, 1-test_error if test_error is not None else 0, 1-val_error if val_error is not None else 0
 
 
-def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writer = None, loss_fn = None):
+def train_loop_clam_rna(epoch, model, loader, optimizer, n_classes, bag_weight, writer = None, loss_fn = None, instance_loss_fn=None):
     model.train()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
-    inst_logger = Accuracy_Logger(n_classes=n_classes)
-    
+    inst_logger = Accuracy_Logger(n_classes=2) # Instance classification is binary (true/false for a class) or (pos/neg)
+
     train_loss = 0.
     train_error = 0.
-    train_inst_loss = 0.
+    train_inst_loss_total = 0. # Renamed to avoid conflict
     inst_count = 0
 
     print('\n')
-    for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+    for batch_idx, (data, label) in enumerate(loader): # Data is now (concatenated_features, label)
         data, label = data.to(device), label.to(device)
-        logits, Y_prob, Y_hat, _, instance_dict = model(data, tangle_feat=tangle_feat, label=label, instance_eval=True)
+        # Model's forward now takes concatenated features. instance_eval needs to be True for CLAM.
+        logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
 
         acc_logger.log(Y_hat, label)
-        loss = loss_fn(logits, label)
+        loss = loss_fn(logits, label) # Bag loss
         loss_value = loss.item()
 
-        instance_loss = instance_dict['instance_loss']
-        inst_count+=1
-        instance_loss_value = instance_loss.item()
-        train_inst_loss += instance_loss_value
+        total_loss = bag_weight * loss
         
-        total_loss = bag_weight * loss + (1-bag_weight) * instance_loss 
+        if instance_loss_fn and 'instance_loss' in instance_dict and instance_dict['instance_loss'] is not None :
+            instance_loss = instance_dict['instance_loss']
+            instance_loss_value = instance_loss.item()
+            train_inst_loss_total += instance_loss_value
+            inst_count+=1
+            total_loss += (1-bag_weight) * instance_loss
+            
+            inst_preds = instance_dict['inst_preds']
+            inst_labels = instance_dict['inst_labels']
+            inst_logger.log_batch(inst_preds, inst_labels)
+        else: # Handle case where instance loss is not used or not returned
+            instance_loss_value = 0.0
 
-        inst_preds = instance_dict['inst_preds']
-        inst_labels = instance_dict['inst_labels']
-        inst_logger.log_batch(inst_preds, inst_labels)
 
         train_loss += loss_value
         if (batch_idx + 1) % 20 == 0:
-            print('batch {}, loss: {:.4f}, instance_loss: {:.4f}, weighted_loss: {:.4f}, '.format(batch_idx, loss_value, instance_loss_value, total_loss.item()) + 
+            print('batch {}, loss: {:.4f}, instance_loss: {:.4f}, weighted_loss: {:.4f}, '.format(batch_idx, loss_value, instance_loss_value, total_loss.item()) +
                 'label: {}, bag_size: {}'.format(label.item(), data.size(0)))
 
-        error = calculate_error(Y_hat, label)
+        error = calculate_error(Y_hat, label) # calculate_error needs to be a general util
         train_error += error
-        
+
         # backward pass
         total_loss.backward()
         # step
@@ -278,48 +295,52 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
     train_loss /= len(loader)
     train_error /= len(loader)
     
+    current_train_inst_loss = 0.0
     if inst_count > 0:
-        train_inst_loss /= inst_count
-        print('\n')
-        for i in range(2):
+        current_train_inst_loss = train_inst_loss_total / inst_count
+        print('\nInstance Clustering Stats:')
+        for i in range(2): # Binary for instance
             acc, correct, count = inst_logger.get_summary(i)
-            print('class {} clustering acc {}: correct {}/{}'.format(i, acc, correct, count))
+            print('class {} clustering acc {}: correct {}/{}'.format(i, acc if acc is not None else "N/A", correct, count))
 
-    print('Epoch: {}, train_loss: {:.4f}, train_clustering_loss:  {:.4f}, train_error: {:.4f}'.format(epoch, train_loss, train_inst_loss,  train_error))
+
+    print('Epoch: {}, train_loss: {:.4f}, train_clustering_loss: {:.4f}, train_error: {:.4f}'.format(epoch, train_loss, current_train_inst_loss,  train_error))
     for i in range(n_classes):
         acc, correct, count = acc_logger.get_summary(i)
-        print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
+        print('class {}: acc {}, correct {}/{}'.format(i, acc if acc is not None else "N/A", correct, count))
         if writer and acc is not None:
             writer.add_scalar('train/class_{}_acc'.format(i), acc, epoch)
 
     if writer:
         writer.add_scalar('train/loss', train_loss, epoch)
         writer.add_scalar('train/error', train_error, epoch)
-        writer.add_scalar('train/clustering_loss', train_inst_loss, epoch)
+        if inst_count > 0:
+             writer.add_scalar('train/clustering_loss', current_train_inst_loss, epoch)
 
-def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_fn = None):   
+
+def train_loop_rna(epoch, model, loader, optimizer, n_classes, writer = None, loss_fn = None):
     model.train()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
     train_loss = 0.
     train_error = 0.
 
     print('\n')
-    for  batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+    for batch_idx, (data, label) in enumerate(loader): # Data is (concatenated_features, label)
         data, label = data.to(device), label.to(device)
+        # For MIL models or CLAM without instance_eval
+        logits, Y_prob, Y_hat, _, _ = model(data) # Assuming model can handle instance_eval=False or not passed
 
-        logits, Y_prob, Y_hat, _, _ = model(data)
-        
         acc_logger.log(Y_hat, label)
         loss = loss_fn(logits, label)
         loss_value = loss.item()
-        
+
         train_loss += loss_value
         if (batch_idx + 1) % 20 == 0:
             print('batch {}, loss: {:.4f}, label: {}, bag_size: {}'.format(batch_idx, loss_value, label.item(), data.size(0)))
-           
+
         error = calculate_error(Y_hat, label)
         train_error += error
-        
+
         # backward pass
         loss.backward()
         # step
@@ -333,53 +354,48 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_f
     print('Epoch: {}, train_loss: {:.4f}, train_error: {:.4f}'.format(epoch, train_loss, train_error))
     for i in range(n_classes):
         acc, correct, count = acc_logger.get_summary(i)
-        print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
-        if writer:
+        print('class {}: acc {}, correct {}/{}'.format(i, acc if acc is not None else "N/A", correct, count))
+        if writer and acc is not None:
             writer.add_scalar('train/class_{}_acc'.format(i), acc, epoch)
 
     if writer:
         writer.add_scalar('train/loss', train_loss, epoch)
         writer.add_scalar('train/error', train_error, epoch)
 
-   
-def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir=None):
+
+def validate_rna(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir=None):
     model.eval()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
-    # loader.dataset.update_mode(True)
     val_loss = 0.
     val_error = 0.
-    
+
     prob = np.zeros((len(loader), n_classes))
     labels = np.zeros(len(loader))
 
     with torch.no_grad():
-        for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+        for batch_idx, (data, label) in enumerate(loader): # Data is (concatenated_features, label)
             data, label = data.to(device, non_blocking=True), label.to(device, non_blocking=True)
-
+            # For MIL models or CLAM without instance_eval
             logits, Y_prob, Y_hat, _, _ = model(data)
 
             acc_logger.log(Y_hat, label)
-            
             loss = loss_fn(logits, label)
-
             prob[batch_idx] = Y_prob.cpu().numpy()
             labels[batch_idx] = label.item()
-            
+
             val_loss += loss.item()
             error = calculate_error(Y_hat, label)
             val_error += error
-            
 
     val_error /= len(loader)
     val_loss /= len(loader)
 
     if n_classes == 2:
         auc = roc_auc_score(labels, prob[:, 1])
-    
     else:
         auc = roc_auc_score(labels, prob, multi_class='ovr')
-    
-    
+
+
     if writer:
         writer.add_scalar('val/loss', val_loss, epoch)
         writer.add_scalar('val/auc', auc, epoch)
@@ -388,131 +404,136 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer
     print('\nVal Set, val_loss: {:.4f}, val_error: {:.4f}, auc: {:.4f}'.format(val_loss, val_error, auc))
     for i in range(n_classes):
         acc, correct, count = acc_logger.get_summary(i)
-        print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))     
+        print('class {}: acc {}, correct {}/{}'.format(i, acc if acc is not None else "N/A", correct, count))
 
     if early_stopping:
         assert results_dir
         early_stopping(epoch, val_loss, model, ckpt_name = os.path.join(results_dir, "s_{}_checkpoint.pt".format(cur)))
-        
+
         if early_stopping.early_stop:
             print("Early stopping")
             return True
-
     return False
 
-def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir = None):
+def validate_clam_rna(cur, epoch, model, loader, n_classes, early_stopping = None, writer = None, loss_fn = None, results_dir = None, instance_loss_fn=None):
     model.eval()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
-    inst_logger = Accuracy_Logger(n_classes=n_classes)
+    inst_logger = Accuracy_Logger(n_classes=2) # Instance is binary
     val_loss = 0.
     val_error = 0.
 
-    val_inst_loss = 0.
-    val_inst_acc = 0.
+    val_inst_loss_total = 0.
     inst_count=0
-    
+
     prob = np.zeros((len(loader), n_classes))
     labels = np.zeros(len(loader))
-    sample_size = model.k_sample
-    with torch.inference_mode():
-        for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
-            data, label = data.to(device), label.to(device)      
-            logits, Y_prob, Y_hat, _, instance_dict = model(data, tangle_feat=tangle_feat, label=label, instance_eval=True)
-            acc_logger.log(Y_hat, label)
-            
-            loss = loss_fn(logits, label)
+    # sample_size = model.k_sample # Not directly used here, but k_sample is in model
 
+    with torch.inference_mode(): # or torch.no_grad()
+        for batch_idx, (data, label) in enumerate(loader): # Data is (concatenated_features, label)
+            data, label = data.to(device), label.to(device)
+            logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
+            acc_logger.log(Y_hat, label)
+
+            loss = loss_fn(logits, label) # Bag loss
             val_loss += loss.item()
 
-            instance_loss = instance_dict['instance_loss']
-            
-            inst_count+=1
-            instance_loss_value = instance_loss.item()
-            val_inst_loss += instance_loss_value
+            if instance_loss_fn and 'instance_loss' in instance_dict and instance_dict['instance_loss'] is not None:
+                instance_loss = instance_dict['instance_loss']
+                instance_loss_value = instance_loss.item()
+                val_inst_loss_total += instance_loss_value
+                inst_count+=1
+                
+                inst_preds = instance_dict['inst_preds']
+                inst_labels = instance_dict['inst_labels']
+                inst_logger.log_batch(inst_preds, inst_labels)
 
-            inst_preds = instance_dict['inst_preds']
-            inst_labels = instance_dict['inst_labels']
-            inst_logger.log_batch(inst_preds, inst_labels)
 
             prob[batch_idx] = Y_prob.cpu().numpy()
             labels[batch_idx] = label.item()
-            
+
             error = calculate_error(Y_hat, label)
             val_error += error
 
     val_error /= len(loader)
     val_loss /= len(loader)
+    
+    current_val_inst_loss = 0.0
+    if inst_count > 0:
+        current_val_inst_loss = val_inst_loss_total / inst_count
+
 
     if n_classes == 2:
         auc = roc_auc_score(labels, prob[:, 1])
-        aucs = []
     else:
         aucs = []
         binary_labels = label_binarize(labels, classes=[i for i in range(n_classes)])
         for class_idx in range(n_classes):
-            if class_idx in labels:
+            if class_idx in labels: # Make sure class is present
                 fpr, tpr, _ = roc_curve(binary_labels[:, class_idx], prob[:, class_idx])
                 aucs.append(calc_auc(fpr, tpr))
             else:
                 aucs.append(float('nan'))
-
         auc = np.nanmean(np.array(aucs))
 
     print('\nVal Set, val_loss: {:.4f}, val_error: {:.4f}, auc: {:.4f}'.format(val_loss, val_error, auc))
     if inst_count > 0:
-        val_inst_loss /= inst_count
-        for i in range(2):
+        print('Instance Clustering Stats (Val):')
+        for i in range(2): # Binary for instance
             acc, correct, count = inst_logger.get_summary(i)
-            print('class {} clustering acc {}: correct {}/{}'.format(i, acc, correct, count))
-    
+            print('class {} clustering acc {}: correct {}/{}'.format(i, acc if acc is not None else "N/A", correct, count))
+
+
     if writer:
         writer.add_scalar('val/loss', val_loss, epoch)
         writer.add_scalar('val/auc', auc, epoch)
         writer.add_scalar('val/error', val_error, epoch)
-        writer.add_scalar('val/inst_loss', val_inst_loss, epoch)
+        if inst_count > 0:
+            writer.add_scalar('val/inst_loss', current_val_inst_loss, epoch)
 
 
     for i in range(n_classes):
         acc, correct, count = acc_logger.get_summary(i)
-        print('class {}: acc {}, correct {}/{}'.format(i, acc, correct, count))
-        
+        print('class {}: acc {}, correct {}/{}'.format(i, acc if acc is not None else "N/A", correct, count))
+
         if writer and acc is not None:
             writer.add_scalar('val/class_{}_acc'.format(i), acc, epoch)
-     
+
 
     if early_stopping:
         assert results_dir
         early_stopping(epoch, val_loss, model, ckpt_name = os.path.join(results_dir, "s_{}_checkpoint.pt".format(cur)))
-        
+
         if early_stopping.early_stop:
             print("Early stopping")
             return True
-
     return False
 
-def summary(model, loader, n_classes):
+def summary_rna(model, loader, n_classes):
     acc_logger = Accuracy_Logger(n_classes=n_classes)
     model.eval()
-    test_loss = 0.
     test_error = 0.
 
     all_probs = np.zeros((len(loader), n_classes))
     all_labels = np.zeros(len(loader))
 
+    # Ensure slide_ids are correctly obtained, loader.dataset should be Generic_Split_RNA
     slide_ids = loader.dataset.slide_data['slide_id']
     patient_results = {}
 
-    for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+    for batch_idx, (data, label) in enumerate(loader): # Data is (concatenated_features, label)
         data, label = data.to(device), label.to(device)
-        slide_id = slide_ids.iloc[batch_idx]
-        with torch.inference_mode():
-            logits, Y_prob, Y_hat, _, _ = model(data)
+        slide_id = slide_ids.iloc[batch_idx] # Make sure this indexing is robust
+
+        with torch.inference_mode(): # or torch.no_grad()
+             # For MIL or CLAM without instance_eval, or CLAM where instance_eval is False for summary
+            logits, Y_prob, Y_hat, _, _ = model(data, instance_eval=False)
 
         acc_logger.log(Y_hat, label)
         probs = Y_prob.cpu().numpy()
         all_probs[batch_idx] = probs
         all_labels[batch_idx] = label.item()
-        
+
         patient_results.update({slide_id: {'slide_id': np.array(slide_id), 'prob': probs, 'label': label.item()}})
         error = calculate_error(Y_hat, label)
         test_error += error
@@ -521,18 +542,29 @@ def summary(model, loader, n_classes):
 
     if n_classes == 2:
         auc = roc_auc_score(all_labels, all_probs[:, 1])
-        aucs = []
     else:
         aucs = []
         binary_labels = label_binarize(all_labels, classes=[i for i in range(n_classes)])
         for class_idx in range(n_classes):
-            if class_idx in all_labels:
+            if class_idx in all_labels: # Make sure class is present
                 fpr, tpr, _ = roc_curve(binary_labels[:, class_idx], all_probs[:, class_idx])
                 aucs.append(calc_auc(fpr, tpr))
             else:
                 aucs.append(float('nan'))
-
         auc = np.nanmean(np.array(aucs))
 
-
     return patient_results, test_error, auc, acc_logger
+
+# These utility functions (get_optim, print_network, calculate_error, get_split_loader)
+# are assumed to be defined elsewhere (e.g., in utils.utils) and general enough.
+# If get_split_loader needs specific changes for the new dataset, it would also need modification.
+# For now, assuming it works as long as the dataset __getitem__ returns (data, label).
+
+# Example stubs for assumed utility functions if not available elsewhere
+# def print_network(model): print(model)
+# def get_optim(model, args): return torch.optim.Adam(model.parameters(), lr=args.lr, weight_decay=args.reg)
+# def calculate_error(Y_hat, Y): return 1 - Y_hat.eq(Y).cpu().float().mean().item()
+# def get_split_loader(split_dataset, training=False, testing=False, weighted=False, batch_size=1):
+#     if split_dataset is None: return None
+#     from torch.utils.data import DataLoader
+#     return DataLoader(split_dataset, batch_size=batch_size, shuffle=training)

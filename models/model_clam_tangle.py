@@ -74,9 +74,9 @@ args:
     instance_loss_fn: loss function to supervise instance-level training
     subtyping: whether it's a subtyping problem
 """
-class CLAM_SB(nn.Module):
+class CLAM_SB_Tangle(nn.Module):
     def __init__(self, gate = True, size_arg = "small", dropout = 0., k_sample=8, n_classes=2,
-        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=1024):
+        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=2048):
         super().__init__()
         self.size_dict = {"small": [embed_dim, 512, 256], "big": [embed_dim, 512, 384]}
         size = self.size_dict[size_arg]
@@ -135,7 +135,12 @@ class CLAM_SB(nn.Module):
         instance_loss = self.instance_loss_fn(logits, p_targets)
         return instance_loss, p_preds, p_targets
 
-    def forward(self, h, label=None, instance_eval=False, return_features=False, attention_only=False):
+    def forward(self, h, tangle_feat = None, label=None, instance_eval=False, return_features=False, attention_only=False):
+        if tangle_feat is not None:
+            tangle_feat = tangle_feat.to(h.device)
+            tangle_feat_expanded = tangle_feat.unsqueeze(0).repeat(h.size(0), 1)
+            h = torch.cat([h, tangle_feat_expanded], dim=1)
+
         A, h = self.attention_net(h)  # NxK        
         A = torch.transpose(A, 1, 0)  # KxN
         if attention_only:
@@ -180,9 +185,9 @@ class CLAM_SB(nn.Module):
             results_dict.update({'features': M})
         return logits, Y_prob, Y_hat, A_raw, results_dict
 
-class CLAM_MB(CLAM_SB):
+class CLAM_MB_Tangle(CLAM_SB_Tangle):
     def __init__(self, gate = True, size_arg = "small", dropout = 0., k_sample=8, n_classes=2,
-        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=1024):
+        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=2048):
         nn.Module.__init__(self)
         self.size_dict = {"small": [embed_dim, 512, 256], "big": [embed_dim, 512, 384]}
         size = self.size_dict[size_arg]
@@ -204,10 +209,9 @@ class CLAM_MB(CLAM_SB):
 
     def forward(self, h, tangle_feat = None, label=None, instance_eval=False, return_features=False, attention_only=False):
         if tangle_feat is not None:
-        # Ensure tangle_feat is a tensor on the same device and shape
             tangle_feat = tangle_feat.to(h.device)
             tangle_feat_expanded = tangle_feat.unsqueeze(0).repeat(h.size(0), 1)
-            h = torch.cat([h, tangle_feat_expanded], dim=1)   # [N_patches, d_feat + d_tangle]
+            h = torch.cat([h, tangle_feat_expanded], dim=1)
         
         A, h = self.attention_net(h)  # NxK        
         A = torch.transpose(A, 1, 0)  # KxN
