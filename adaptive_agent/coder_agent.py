@@ -56,6 +56,18 @@ def save_script(script_text, path):
     with open(path, "w") as file:
         file.write(script_text)
 
+def _extract_failure_excerpt(log_lines):
+    """Return a short excerpt around the first detected failure keyword."""
+    keywords = ["traceback", "exception", "nan"]
+    for idx, line in enumerate(log_lines):
+        lower = line.lower()
+        if any(k in lower for k in keywords):
+            start = max(0, idx - 2)
+            end = min(len(log_lines), idx + 3)
+            return "".join(log_lines[start:end]).strip()
+    return ""
+
+
 def run_script_and_log(script_path):
     log_path = get_log_filename(script_path)
     with open(log_path, "w") as logfile:
@@ -65,9 +77,28 @@ def run_script_and_log(script_path):
             stderr=subprocess.STDOUT,
             timeout=None  # Remove timeouts due to model training
         )
-    return process.returncode == 0, log_path
+
+    success = process.returncode == 0
+    notes = ""
+
+    try:
+        with open(log_path, "r") as f:
+            log_lines = f.readlines()
+
+        if not success:
+            notes = "".join(log_lines[-10:]).strip()
+        else:
+            excerpt = _extract_failure_excerpt(log_lines)
+            if excerpt:
+                success = False
+                notes = excerpt
+    except Exception as e:
+        notes = f"Could not read log: {e}"
+
+    return success, log_path, notes
 
 def retry_until_success(strategy_spec, max_retries=5):
+    notes = ""
     for attempt in range(max_retries):
         print(f"[Coder Agent] Attempt {attempt + 1}...")
         script_name = generate_experiment_filename()
@@ -76,15 +107,17 @@ def retry_until_success(strategy_spec, max_retries=5):
         modified_script = build_script_from_template(MAIN_TEMPLATE_PATH, strategy_spec)
         save_script(modified_script, script_path)
 
-        success, log_path = run_script_and_log(script_path)
+        success, log_path, run_notes = run_script_and_log(script_path)
+        if run_notes:
+            notes += f"Attempt {attempt + 1}:\n{run_notes}\n"
 
         if success:
             print(f"[Coder Agent] Experiment completed successfully. Log saved at {log_path}")
-            return True, script_path, log_path
+            return True, script_path, log_path, notes.strip()
         else:
             print(f"[Coder Agent] Run failed. Log saved at {log_path}. Retrying...\n")
 
-    return False, script_path, log_path
+    return False, script_path, log_path, notes.strip()
 
 def try_implement_method(method_info, max_retries=5):
     """Attempt to implement and evaluate a method.
@@ -104,13 +137,13 @@ def try_implement_method(method_info, max_retries=5):
 
     os.makedirs(EXPERIMENT_DIR, exist_ok=True)
 
-    success, script_path, log_path = retry_until_success(
+    success, script_path, log_path, run_notes = retry_until_success(
         method_info.get("justification", ""), max_retries=max_retries
     )
 
     auc = 0.0
     cohort_aucs = {}
-    notes = ""
+    notes = run_notes or ""
 
     if success:
         try:
@@ -131,10 +164,10 @@ def try_implement_method(method_info, max_retries=5):
             cohort_aucs = eval_result.get("cohort_aucs", {})
             success = eval_result.get("success", False)
         except Exception as e:
-            notes = f"Evaluation failed: {e}"
+            notes = (notes + "\n" if notes else "") + f"Evaluation failed: {e}"
             success = False
     else:
-        notes = "Training failed"
+         notes = f"Training failed:\n{notes}" if notes else "Training failed"
 
     return {
         "success": success,
@@ -155,8 +188,8 @@ if __name__ == "__main__":
 
     os.makedirs(EXPERIMENT_DIR, exist_ok=True)
 
-    result = retry_until_success(args.strategy)
-    if result[0]:
-        print(f"[Coder Agent] Final experiment script: {result[1]}")
+    success, script_path, _log_path, _notes = retry_until_success(args.strategy)
+    if success:
+        print(f"[Coder Agent] Final experiment script: {script_path}")
     else:
         print("[Coder Agent] All attempts failed.")
