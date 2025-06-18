@@ -66,6 +66,8 @@ if __name__ == "__main__":
             f"**Coder Result**:\n- Success: {result['success']}\n"
             f"- AUC: {result['auc']:.4f}\n"
             f"- Cohort AUCs: {result['cohort_aucs']}\n"
+            f"- Script: {result['script_path']}\n"
+            f"- Log: {result['log_path']}\n"
             f"- Notes:\n```\n{result['notes']}\n```"
         )
 

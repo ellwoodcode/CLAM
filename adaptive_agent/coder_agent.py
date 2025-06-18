@@ -12,6 +12,15 @@ MODEL_NAME = "codex-mini-latest"  # or replace with best-performing Codex varian
 
 openai.api_key = OPENAI_API_KEY
 
+# Evaluation configuration defaults
+DEFAULT_RESULTS_DIR = os.getenv("RESULTS_DIR", "results")
+DEFAULT_DATA_ROOT = os.getenv("DATA_ROOT_DIR", "./data")
+DEFAULT_TASK = os.getenv("TASK", "task_1_tumor_vs_normal")
+DEFAULT_MODEL_TYPE = os.getenv("MODEL_TYPE", "clam_sb")
+DEFAULT_EMBED_DIM = os.getenv("EMBED_DIM", "1024")
+DEFAULT_K = os.getenv("K_FOLDS", "3")
+DEFAULT_MODELS_EXP = os.getenv("MODELS_EXP_CODE", "None_s1")
+
 # === FUNCTIONS ===
 def generate_experiment_filename():
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -76,6 +85,65 @@ def retry_until_success(strategy_spec, max_retries=5):
             print(f"[Coder Agent] Run failed. Log saved at {log_path}. Retrying...\n")
 
     return False, script_path, log_path
+
+def try_implement_method(method_info, max_retries=5):
+    """Attempt to implement and evaluate a method.
+
+    Parameters
+    ----------
+    method_info : dict
+        Dictionary containing ``id``, ``method`` and ``justification`` strings.
+    max_retries : int, optional
+        Number of attempts for ``retry_until_success``.
+
+    Returns
+    -------
+    dict
+        ``{"success", "auc", "cohort_aucs", "notes", "script_path", "log_path"}``
+    """
+
+    os.makedirs(EXPERIMENT_DIR, exist_ok=True)
+
+    success, script_path, log_path = retry_until_success(
+        method_info.get("justification", ""), max_retries=max_retries
+    )
+
+    auc = 0.0
+    cohort_aucs = {}
+    notes = ""
+
+    if success:
+        try:
+            from adaptive_agent.evaluate_all import evaluate_all_cohorts
+
+            eval_result = evaluate_all_cohorts(
+                models_exp_code=DEFAULT_MODELS_EXP,
+                results_dir=DEFAULT_RESULTS_DIR,
+                save_exp_prefix=method_info.get("id", "exp"),
+                task=DEFAULT_TASK,
+                model_type=DEFAULT_MODEL_TYPE,
+                data_root_dir=DEFAULT_DATA_ROOT,
+                embed_dim=DEFAULT_EMBED_DIM,
+                k=DEFAULT_K,
+            )
+
+            auc = eval_result.get("mean_auc", 0.0)
+            cohort_aucs = eval_result.get("cohort_aucs", {})
+            success = eval_result.get("success", False)
+        except Exception as e:
+            notes = f"Evaluation failed: {e}"
+            success = False
+    else:
+        notes = "Training failed"
+
+    return {
+        "success": success,
+        "auc": auc,
+        "cohort_aucs": cohort_aucs,
+        "notes": notes,
+        "script_path": script_path,
+        "log_path": log_path,
+    }
 
 # === MAIN ENTRY ===
 if __name__ == "__main__":
