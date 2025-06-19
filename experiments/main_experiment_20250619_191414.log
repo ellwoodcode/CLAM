@@ -1,0 +1,45 @@
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+Traceback (most recent call last):
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_191414.py", line 786, in <module>
+    ssl_pretrain(args)
+    ~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_191414.py", line 302, in ssl_pretrain
+    encoder = torchvision.models.resnet18(pretrained=False)
+              ^^^^^^^^^^^
+NameError: name 'torchvision' is not defined

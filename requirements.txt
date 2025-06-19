@@ -1,0 +1,21 @@
+# Python package dependencies for CLAM
+# Derived from env.yml and code imports
+arxiv
+openai
+h5py
+matplotlib
+numpy
+opencv-python
+openslide-python
+pandas
+Pillow
+PyYAML
+scikit-learn
+scipy
+tensorboardX
+timm==0.9.8
+torch
+torchvision
+transformers
+tqdm
+git+https://github.com/oval-group/smooth-topk.git

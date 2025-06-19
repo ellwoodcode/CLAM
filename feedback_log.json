@@ -1,0 +1,42 @@
+{
+  "method_20250619_1": {
+    "title": "",
+    "source": "arXiv",
+    "status": "failed",
+    "reason": "Did not outperform baseline",
+    "auc": 0.0,
+    "timestamp": "2025-06-19T19:04:43.666749"
+  },
+  "method_20250619_2": {
+    "title": "",
+    "source": "arXiv",
+    "status": "failed",
+    "reason": "Did not outperform baseline",
+    "auc": 0.0,
+    "timestamp": "2025-06-19T19:13:35.740271"
+  },
+  "method_20250619_3": {
+    "title": "",
+    "source": "arXiv",
+    "status": "failed",
+    "reason": "Did not outperform baseline",
+    "auc": 0.0,
+    "timestamp": "2025-06-19T19:21:16.870588"
+  },
+  "method_20250619_4": {
+    "title": "",
+    "source": "arXiv",
+    "status": "failed",
+    "reason": "Did not outperform baseline",
+    "auc": 0.0,
+    "timestamp": "2025-06-19T19:29:57.064261"
+  },
+  "method_20250619_5": {
+    "title": "",
+    "source": "arXiv",
+    "status": "failed",
+    "reason": "Did not outperform baseline",
+    "auc": 0.0,
+    "timestamp": "2025-06-19T19:36:14.976304"
+  }
+}

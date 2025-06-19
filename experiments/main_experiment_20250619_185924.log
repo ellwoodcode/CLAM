@@ -1,0 +1,223 @@
+C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\models\_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\models\_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=ResNet50_Weights.IMAGENET1K_V1`. You can also use `weights=ResNet50_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+Starting SSL pretraining...
+Traceback (most recent call last):
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_185924.py", line 821, in <module>
+    results = main(args)
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_185924.py", line 610, in main
+    ssl_pretrain(args, encoder, ssl_pretrain_loader)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_185924.py", line 550, in ssl_pretrain
+    x_i = transform(data)
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\transforms\transforms.py", line 95, in __call__
+    img = t(img)
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\nn\modules\module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\nn\modules\module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\transforms\transforms.py", line 540, in forward
+    img = t(img)
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\nn\modules\module.py", line 1751, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+           ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\nn\modules\module.py", line 1762, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\transforms\transforms.py", line 1276, in forward
+    img = F.adjust_contrast(img, contrast_factor)
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\transforms\functional.py", line 909, in adjust_contrast
+    return F_t.adjust_contrast(img, contrast_factor)
+           ~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\transforms\_functional_tensor.py", line 188, in adjust_contrast
+    _assert_channels(img, [3, 1])
+    ~~~~~~~~~~~~~~~~^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\transforms\_functional_tensor.py", line 63, in _assert_channels
+    raise TypeError(f"Input image tensor permitted channel values are {permitted}, but found {c}")
+TypeError: Input image tensor permitted channel values are [3, 1], but found 64

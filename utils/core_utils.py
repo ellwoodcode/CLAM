@@ -11,12 +11,6 @@ from sklearn.metrics import auc as calc_auc
 
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-
-def tangle_collate(batch):
-        features, labels, tangle_feats, slide_ids = zip(*batch)
-        return list(features), torch.tensor(labels), list(tangle_feats), list(slide_ids)
-
-
 class Accuracy_Logger(object):
     """Accuracy logger"""
     def __init__(self, n_classes):
@@ -174,11 +168,9 @@ def train(datasets, cur, args):
     print('Done!')
     
     print('\nInit Loaders...', end=' ')
-    from torch.utils.data import DataLoader
-
-    train_loader = DataLoader(train_split, batch_size=1, shuffle=True, collate_fn=tangle_collate)
-    val_loader = DataLoader(val_split, batch_size=1, shuffle=False, collate_fn=tangle_collate)
-    test_loader = DataLoader(test_split, batch_size=1, shuffle=False, collate_fn=tangle_collate)
+    train_loader = get_split_loader(train_split, training=True, testing = args.testing, weighted = args.weighted_sample)
+    val_loader = get_split_loader(val_split,  testing = args.testing)
+    test_loader = get_split_loader(test_split, testing = args.testing)
     print('Done!')
 
     print('\nSetup EarlyStopping...', end=' ')
@@ -241,9 +233,9 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
     inst_count = 0
 
     print('\n')
-    for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+    for batch_idx, (data, label) in enumerate(loader):
         data, label = data.to(device), label.to(device)
-        logits, Y_prob, Y_hat, _, instance_dict = model(data, tangle_feat=tangle_feat, label=label, instance_eval=True)
+        logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
 
         acc_logger.log(Y_hat, label)
         loss = loss_fn(logits, label)
@@ -304,7 +296,7 @@ def train_loop(epoch, model, loader, optimizer, n_classes, writer = None, loss_f
     train_error = 0.
 
     print('\n')
-    for  batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+    for batch_idx, (data, label) in enumerate(loader):
         data, label = data.to(device), label.to(device)
 
         logits, Y_prob, Y_hat, _, _ = model(data)
@@ -353,7 +345,7 @@ def validate(cur, epoch, model, loader, n_classes, early_stopping = None, writer
     labels = np.zeros(len(loader))
 
     with torch.no_grad():
-        for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+        for batch_idx, (data, label) in enumerate(loader):
             data, label = data.to(device, non_blocking=True), label.to(device, non_blocking=True)
 
             logits, Y_prob, Y_hat, _, _ = model(data)
@@ -415,9 +407,9 @@ def validate_clam(cur, epoch, model, loader, n_classes, early_stopping = None, w
     labels = np.zeros(len(loader))
     sample_size = model.k_sample
     with torch.inference_mode():
-        for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+        for batch_idx, (data, label) in enumerate(loader):
             data, label = data.to(device), label.to(device)      
-            logits, Y_prob, Y_hat, _, instance_dict = model(data, tangle_feat=tangle_feat, label=label, instance_eval=True)
+            logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
             acc_logger.log(Y_hat, label)
             
             loss = loss_fn(logits, label)
@@ -502,7 +494,7 @@ def summary(model, loader, n_classes):
     slide_ids = loader.dataset.slide_data['slide_id']
     patient_results = {}
 
-    for batch_idx, (data, label, tangle_feat, slide_id) in enumerate(loader):
+    for batch_idx, (data, label) in enumerate(loader):
         data, label = data.to(device), label.to(device)
         slide_id = slide_ids.iloc[batch_idx]
         with torch.inference_mode():

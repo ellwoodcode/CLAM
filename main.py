@@ -66,7 +66,7 @@ def main(args):
 
 # Generic training settings
 parser = argparse.ArgumentParser(description='Configurations for WSI Training')
-parser.add_argument('--data_root_dir', type=str, default=None, 
+parser.add_argument('--data_root_dir', type=str, default="C:/Users/Mahon/Documents/Research/CLAM/Phase3A_Baseline_Features/Train/TCGA_ims1", 
                     help='data directory')
 parser.add_argument('--embed_dim', type=int, default=1024)
 parser.add_argument('--max_epochs', type=int, default=200,
@@ -83,7 +83,7 @@ parser.add_argument('--k', type=int, default=10, help='number of folds (default:
 parser.add_argument('--k_start', type=int, default=-1, help='start fold (default: -1, last fold)')
 parser.add_argument('--k_end', type=int, default=-1, help='end fold (default: -1, first fold)')
 parser.add_argument('--results_dir', default='./results', help='results directory (default: ./results)')
-parser.add_argument('--split_dir', type=str, default=None, 
+parser.add_argument('--split_dir', type=str, default="C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1", 
                     help='manually specify the set of splits to use, ' 
                     +'instead of infering from the task and label_frac argument (default: None)')
 parser.add_argument('--log_data', action='store_true', default=False, help='log data using tensorboard')
@@ -154,7 +154,7 @@ print('\nLoad Dataset')
 
 if args.task == 'task_1_tumor_vs_normal':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = 'C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual/labels_ims2_filtered.csv',
+    dataset = Generic_MIL_Dataset(csv_path = 'C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual/labels_ims1_filtered.csv',
                             data_dir= args.data_root_dir,
                             shuffle = False, 
                             seed = args.seed, 
@@ -186,11 +186,6 @@ if not os.path.isdir(args.results_dir):
 args.results_dir = os.path.join(args.results_dir, str(args.exp_code) + '_s{}'.format(args.seed))
 if not os.path.isdir(args.results_dir):
     os.mkdir(args.results_dir)
-
-if args.split_dir is None:
-    args.split_dir = os.path.join('splits', args.task+'_{}'.format(int(args.label_frac*100)))
-else:
-    args.split_dir = os.path.join('splits', args.split_dir)
 
 print('split_dir: ', args.split_dir)
 assert os.path.isdir(args.split_dir)

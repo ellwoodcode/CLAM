@@ -9,20 +9,37 @@ openai.api_key = ""
 def adapt_method_to_wsi(method_text, slide_level=True, feature_based=True):
     """
     Sends the raw method suggestion from the researcher agent to GPT
-    and receives an adapted, coder-ready implementation spec.
+    and receives an adapted, coder-ready implementation spec that targets main_template.py only.
     """
+    template_summary = (
+        "The current script, `main_template.py`, implements a full training pipeline for weakly supervised WSI classification "
+        "using Multiple Instance Learning (MIL) with CLAM variants (`clam_sb`, `clam_mb`) or simpler MIL MLP architectures. "
+        "The training loop, validation, model construction, and data handling are all defined in this single script. "
+        "It processes slides as bags of patch-level features and uses slide-level binary or multiclass labels. "
+        "It imports utility classes like `EarlyStopping`, `Accuracy_Logger`, and `print_network` from `core_utils`, "
+        "but does not rely on external training logic. All learning logic is local and self-contained."
+    )
     context = (
         "You are a strategist responsible for adapting machine learning methods to weakly supervised classification "
-        "of Whole Slide Images (WSIs) in digital pathology. Each slide is represented as a bag of features (e.g., ResNet50), "
-        "with only slide-level binary labels (tumor vs. normal). CLAM is currently used as the baseline architecture.\n\n"
-        f"Here is a proposed method:\n\n{method_text}\n\n"
-        "Adapt this method to this WSI context. Your output should include:\n"
-        "- A precise implementation strategy suitable for patch-level MIL with slide-level labels\n"
-        "- Any architectural modifications (e.g., auxiliary heads, new losses)\n"
-        "- Assumptions or requirements (e.g., patch features, attention maps)\n"
-        "- What files would be needed or modified (e.g., training script, dataset class, loss function)\n"
-        "- Any specific risks or expected failure points in this context\n"
-        "Make sure your spec is useful for a coding agent to implement in PyTorch."
+        "of Whole Slide Images (WSIs) in digital pathology. Each slide is represented as a bag of features "
+        "(e.g., extracted by ResNet50), with only slide-level labels. CLAM is currently used as the baseline architecture.\n\n"
+
+        "Your goal is to describe **how to integrate the proposed method into a single Python script, `main_template.py`.**\n\n"
+        "⚠️ DO NOT suggest creating additional scripts. The code-writing agent will overwrite `main_template.py`, so your spec "
+        "must describe changes entirely within that file.\n\n"
+
+        f"{template_summary}\n\n"
+
+        f"Here is the proposed method:\n\n{method_text}\n\n"
+
+        "Adapt this method to this WSI context. Your output must include:\n"
+        "- A precise implementation strategy for patch-level MIL with slide-level labels\n"
+        "- What specific parts of `main_template.py` should be modified, added, or removed\n"
+        "- Any architectural changes (e.g., encoder, losses, attention, auxiliary heads)\n"
+        "- Any required import or dependency changes\n"
+        "- All assumptions (e.g., feature format, patch size, label types)\n"
+        "- Any risks or likely failure modes when using this method in this context\n\n"
+        "Make sure your spec is clear, complete, and ready to be passed to a coding agent that will write the final script."
     )
 
     response = openai.chat.completions.create(
@@ -45,10 +62,15 @@ def score_idea(idea_text):
     """
 
     prompt = (
-        "You are an expert research strategist. For the idea below, return a JSON "
-        "object with integer fields 'novelty', 'potential', 'ease' (each 0-10) "
-        "and 'total' which is the sum. Only return the JSON.\n\n"
-        f"Idea:\n{idea_text}"
+    "You are an expert research strategist evaluating proposed machine learning methods for weakly supervised WSI classification.\n"
+    "For each idea, assess it in the following categories:\n"
+    "- 'novelty': Has this idea (or close variations) been applied to WSI or MIL problems before? Give higher scores for approaches new to this domain. (0-10)\n"
+    "- 'potential': If applied to WSI classification, how likely is this method to meaningfully improve generalisability across institutions, scanners, or cohorts? Consider robustness and empirical plausibility. (0-10)\n"
+    "- 'feasibility': Could this method be realistically implemented in a PyTorch-based CLAM pipeline with modest effort? Consider compatibility with attention mechanisms, available inputs (features, labels), and code modularity. (0-10)\n"
+    "You may internally reason, but do not include any explanations in your output.\n"
+    "Return a JSON object with integer fields: 'novelty', 'potential', 'feasibility', and a text field 'commentary' (with any comments about your scores, keep it succinct).\n"
+    "Respond ONLY with the JSON.\n\n"
+    f"Idea:\n{idea_text}"
     )
 
     response = openai.chat.completions.create(
@@ -65,12 +87,17 @@ def score_idea(idea_text):
         scores = {
             "novelty": int(scores.get("novelty", 0)),
             "potential": int(scores.get("potential", 0)),
-            "ease": int(scores.get("ease", 0)),
+            "feasibility": int(scores.get("feasibility", 0)),
+            "commentary": scores.get("commentary", "no comment")
         }
+        print(f"Novelty: {scores['novelty']}\n")
+        print(f"Potential: {scores['potential']}\n")
+        print(f"Feasibility: {scores['feasibility']}\n")
+        print(f"Comments: {scores['commentary']}\n")
     except Exception:
-        scores = {"novelty": 0, "potential": 0, "ease": 0}
+        scores = {"novelty": 0, "potential": 0, "feasibility": 0, "commentary": "error"}
 
-    scores["total"] = scores["novelty"] + scores["potential"] + scores["ease"]
+    scores["total"] = scores["novelty"] + scores["potential"] + scores["feasibility"]
     return scores
 
 
@@ -83,5 +110,5 @@ if __name__ == "__main__":
     )
 
     spec = adapt_method_to_wsi(test_idea)
-    print("\n🧠 Adapted WSI Method Spec:\n")
+    print("\nAdapted WSI Method Spec:\n")
     print(spec)

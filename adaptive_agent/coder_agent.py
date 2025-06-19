@@ -7,7 +7,7 @@ import re
 
 # === CONFIGURATION ===
 EXPERIMENT_DIR = "experiments"
-MAIN_TEMPLATE_PATH = "main.py"
+MAIN_TEMPLATE_PATH = "main_template.py"
 OPENAI_API_KEY = ""
 MODEL_NAME = "gpt-4o-2024-08-06"  # or replace with best-performing Codex variant
 
@@ -17,7 +17,7 @@ openai.api_key = OPENAI_API_KEY
 DEFAULT_RESULTS_DIR = os.getenv("RESULTS_DIR", "results")
 DEFAULT_DATA_ROOT = os.getenv("DATA_ROOT_DIR", "C:/Users/Mahon/Documents/Research/CLAM/Phase3A_Baseline_Features/Train/TCGA_ims1")
 DEFAULT_TASK = os.getenv("TASK", "task_1_tumor_vs_normal")
-DEFAULT_MODEL_TYPE = os.getenv("MODEL_TYPE", "clam_sb")
+DEFAULT_MODEL_TYPE = os.getenv("MODEL_TYPE", "clam_mb")
 DEFAULT_EMBED_DIM = os.getenv("EMBED_DIM", "1024")
 DEFAULT_K = os.getenv("K_FOLDS", "3")
 DEFAULT_MODELS_EXP = os.getenv("MODELS_EXP_CODE", "None_s1")
@@ -34,21 +34,69 @@ def clean_generated_code(code):
     match = re.search(r"```(?:python)?\n(.*?)\n```", code, re.DOTALL)
     return match.group(1).strip() if match else code.strip()
 
-def build_script_from_template(template_path, strategy_spec):
+def build_script_from_template(template_path, strategy_spec, first_attempt=True):
     with open(template_path, "r") as file:
         template = file.read()
+    if first_attempt:
+        prompt = (
+            "You are an expert code-writing agent. Based on the following experiment strategy, rewrite the provided Python training script "
+            "so that it incorporates the proposed changes. You must ensure the modified script is executable and self-contained. Specific requirements:\n\n"
+            "- All new functions (e.g., losses, dataloaders, training routines) must be fully **integrated into the training pipeline**.\n"
+            "- If you add optional features (e.g., `use_ssl`, `use_dino`, `ssl_epochs`), you must:\n"
+            "  • Add new `argparse` arguments with appropriate default values\n"
+            "  • Set any new booleans like `use_ssl` to `True` by default to activate the new feature for testing\n"
+            "  • Pass these arguments where needed in the code (e.g., `train()` or dataset loaders)\n"
+            "- Do **not** include unused stubs or define functions that are never called\n"
+            "- You **may restructure logic**, but must preserve unrelated existing functionality\n"
+            "- **Do not** import functions from the same file — reference them directly instead\n"
+            "- Keep **all logic in one file** — do not split across modules\n\n"
+            "You must also insert the following two lines directly after any `from __future__` imports (if present):\n"
+            "import sys, os\n"
+            "sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))\n\n"
+            "=== CONTEXT ON FILE STRUCTURE AND DATA ACCESS ===\n"
+            "Patch features are stored as .pt files in folders named `pt_files/`, and h5 feature files are in `h5_files/` folders. "
+            "These are organized under:\n"
+            "`C:/Users/Mahon/Documents/Research/CLAM/Phase3A_Baseline_Features/Train/TCGA_ims1` and similar directories.\n"
+            "During training, the path passed as `--data_root_dir` may point to either a single cohort (e.g., `TCGA_ims1`) or a structure that includes `pt_files/` and/or `h5_files/`.\n"
+            "If your code needs to load patch features for SSL or feature analysis, you may scan the `pt_files` subdirectory inside that `data_root_dir`.\n\n"
+            "=== STRATEGY SPECIFICATION ===\n"
+            f"{strategy_spec}\n\n"
+            "=== ORIGINAL SCRIPT ===\n"
+            f"{template}\n\n"
+            "Now return the complete, modified script with only the necessary and relevant changes applied. Ensure the script will run end-to-end."
+        )
+    else:
+        prompt = ("You are an expert debugging agent. Based on the following experiment strategy and the previous failed attempt, revise the provided Python training script to resolve the failure and complete the integration successfully. Your task is to correct the script, not regenerate it from scratch, while preserving all functional progress already made. Specific requirements:\n\n"
+        "- Diagnose and resolve any issues that caused the previous run to fail, using the traceback or error context provided.\n"
+        "- Maintain any working logic from the original script unless it directly contributes to the failure.\n"
+        "- If needed, re-integrate or re-implement functions (e.g., custom losses, dataloaders, training routines) so they are fully operational in the training pipeline.\n"
+        "- If any optional features (e.g., `use_ssl`, `use_dino`, `ssl_epochs`) are introduced:\n"
+        "  • Add appropriate `argparse` arguments with default values\n"
+        "  • Set booleans like `use_ssl` to `True` by default\n"
+        "  • Ensure arguments are passed through to the training routine and/or dataset as needed\n"
+        "- Do **not** include unused stubs, redundant definitions, or unused imports\n"
+        "- You **may restructure logic**, but must preserve unrelated existing functionality\n"
+        "- **Do not** import functions from the same file — reference them directly instead\n"
+        "- Keep **all logic in one file** — do not split across modules\n\n"
+        "You must also insert the following two lines directly after any `from __future__` imports (if present):\n"
+        "import sys, os\n"
+        "sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))\n\n"
+        "=== CONTEXT ON FILE STRUCTURE AND DATA ACCESS ===\n"
+        "Patch features are stored as .pt files in folders named `pt_files/`, and h5 feature files are in `h5_files/` folders. "
+        "These are organized under:\n"
+        "`C:/Users/Mahon/Documents/Research/CLAM/Phase3A_Baseline_Features/Train/TCGA_ims1` and similar directories.\n"
+        "During training, the path passed as `--data_root_dir` may point to either a single cohort (e.g., `TCGA_ims1`) or a structure that includes `pt_files/` and/or `h5_files/`.\n"
+        "If your code needs to load patch features for SSL or feature analysis, you may scan the `pt_files` subdirectory inside that `data_root_dir`.\n\n"
+        "=== STRATEGY SPECIFICATION ===\n"
+        f"{strategy_spec}\n\n"
+        "=== FAILED SCRIPT ===\n"
+        f"{template}\n\n"
+        "Now return the complete, corrected version of the script. Focus only on fixing the relevant error while preserving valid changes from the prior version. Ensure the script runs end-to-end."
+        )
 
-    prompt = (
-        f"You are a code-writing agent. Based on the following experiment strategy, rewrite the provided Python training script "
-        f"so that it incorporates the proposed changes. Do not change unrelated lines. If you modify or regenerate the full script, "
-        f"you must preserve all necessary imports. Add the following lines at the top of the script (but below any `__future__` imports) "
-        f"to ensure correct module paths:\n\n"
-        f"import sys, os\n"
-        f"sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))\n\n"
-        f"--- STRATEGY SPECIFICATION ---\n{strategy_spec}\n\n"
-        f"--- ORIGINAL SCRIPT ---\n{template}\n\n"
-        f"--- MODIFIED SCRIPT ---"
-    )
+    print("\n========== PROMPT SENT TO API ==========\n")
+    print(prompt)  # Print first 5000 characters for brevity
+    print("\n========== END PROMPT ==========\n")
 
     response = openai.chat.completions.create(
         model=MODEL_NAME,
@@ -59,7 +107,12 @@ def build_script_from_template(template_path, strategy_spec):
         temperature=0.2,
     )
 
-    return response.choices[0].message.content.strip()
+    raw_response = response.choices[0].message.content.strip()
+    print("\n========== RAW API RESPONSE ==========\n")
+    print(raw_response)  # Print first 5000 characters for brevity
+    print("\n========== END RESPONSE ==========\n")
+
+    return raw_response
 
 def save_script(script_text, path):
     with open(path, "w") as file:
@@ -117,14 +170,50 @@ def run_script_and_log(script_path):
 
     return success, log_path, notes
 
+def extract_traceback_from_log(log_path):
+    try:
+        with open(log_path, "r") as f:
+            lines = f.readlines()
+
+        traceback_lines = []
+        in_traceback = False
+
+        for line in lines:
+            if "Traceback" in line:
+                in_traceback = True
+                traceback_lines = [line]  # reset and start fresh
+            elif in_traceback:
+                traceback_lines.append(line)
+
+        if traceback_lines:
+            return "".join(traceback_lines).strip()
+
+        return ""  # No traceback found
+    except Exception as e:
+        return f"Error reading log: {e}"
+
 def retry_until_success(strategy_spec, max_retries=5):
     notes = ""
+    last_traceback = ""
+    source_path = MAIN_TEMPLATE_PATH  # start with template
+    first_attempt = True
     for attempt in range(max_retries):
+        first_attempt = (attempt == 0)
         print(f"[Coder Agent] Attempt {attempt + 1}...")
         script_name = generate_experiment_filename()
         script_path = os.path.join(EXPERIMENT_DIR, script_name)
 
-        modified_script = build_script_from_template(MAIN_TEMPLATE_PATH, strategy_spec)
+        if last_traceback:
+            full_strategy = (
+                f"{strategy_spec}\n\n"
+                f"=== ERROR FROM PREVIOUS ATTEMPT ===\n"
+                f"{last_traceback.strip()}\n"
+                f"Please correct this error in the next version."
+            )
+        else:
+            full_strategy = strategy_spec
+
+        modified_script = build_script_from_template(source_path, full_strategy, first_attempt)
         modified_script = clean_generated_code(modified_script)
         save_script(modified_script, script_path)
 
@@ -137,6 +226,9 @@ def retry_until_success(strategy_spec, max_retries=5):
             return True, script_path, log_path, notes.strip()
         else:
             print(f"[Coder Agent] Run failed. Log saved at {log_path}. Retrying...\n")
+            last_traceback = extract_traceback_from_log(log_path) 
+            print(f"[Coder Agent] Detected error:\n{last_traceback[:500]}")
+            source_path = script_path
 
     return False, script_path, log_path, notes.strip()
 

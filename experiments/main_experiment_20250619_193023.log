@@ -1,0 +1,247 @@
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+
+Training Fold 0!
+
+Init train/val/test splits... 
+Done!
+Training on 285 samples
+Validating on 34 samples
+Testing on 31 samples
+
+Init loss function... Done!
+
+Init Model... Done!
+CLAM_MB(
+  (attention_net): Sequential(
+    (0): Linear(in_features=1024, out_features=512, bias=True)
+    (1): ReLU()
+    (2): Dropout(p=0.25, inplace=False)
+    (3): Attn_Net_Gated(
+      (attention_a): Sequential(
+        (0): Linear(in_features=512, out_features=256, bias=True)
+        (1): Tanh()
+        (2): Dropout(p=0.25, inplace=False)
+      )
+      (attention_b): Sequential(
+        (0): Linear(in_features=512, out_features=256, bias=True)
+        (1): Sigmoid()
+        (2): Dropout(p=0.25, inplace=False)
+      )
+      (attention_c): Linear(in_features=256, out_features=2, bias=True)
+    )
+  )
+  (classifiers): ModuleList(
+    (0-1): 2 x Linear(in_features=512, out_features=1, bias=True)
+  )
+  (instance_classifiers): ModuleList(
+    (0-1): 2 x Linear(in_features=512, out_features=2, bias=True)
+  )
+  (instance_loss_fn): CrossEntropyLoss()
+)
+Total number of parameters: 791048
+Total number of trainable parameters: 791048
+
+Init optimizer ... Done!
+
+Init Loaders... Done!
+
+Setup EarlyStopping... Done!
+
+
+Traceback (most recent call last):
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_193023.py", line 726, in <module>
+    results = main(args)
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_193023.py", line 572, in main
+    results, test_auc, val_auc, test_acc, val_acc  = train(datasets, i, args)
+                                                     ~~~~~^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_193023.py", line 354, in train
+    train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn, args.domain_adaptive_mixup, args.mixup_alpha)
+    ~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_193023.py", line 398, in train_loop_clam
+    for batch_idx, (data, label, domain) in enumerate(loader):
+                   ^^^^^^^^^^^^^^^^^^^^^
+ValueError: not enough values to unpack (expected 3, got 2)

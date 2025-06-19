@@ -1,0 +1,83 @@
+C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\models\_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead.
+  warnings.warn(
+C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torchvision\models\_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=ResNet50_Weights.IMAGENET1K_V1`. You can also use `weights=ResNet50_Weights.DEFAULT` to get the most up-to-date weights.
+  warnings.warn(msg)
+
+Load Dataset
+label column: label
+label dictionary: {'normal_tissue': 0, 'tumor_tissue': 1}
+number of classes: 2
+slide-level counts:  
+ label
+0    262
+1     88
+Name: count, dtype: int64
+Patient-LVL; Number of samples registered in class 0: 110
+Slide-LVL; Number of samples registered in class 0: 262
+Patient-LVL; Number of samples registered in class 1: 66
+Slide-LVL; Number of samples registered in class 1: 88
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+################# Settings ###################
+num_splits:  3
+k_start:  -1
+k_end:  -1
+task:  task_1_tumor_vs_normal
+max_epochs:  200
+results_dir:  results
+lr:  0.0001
+experiment:  autogen_exp
+reg:  1e-05
+label_frac:  1.0
+bag_loss:  ce
+seed:  1
+model_type:  clam_mb
+model_size:  small
+use_drop_out:  0.25
+weighted_sample:  False
+opt:  adam
+bag_weight:  0.7
+inst_loss:  None
+B:  8
+split_dir:  C:/Users/Mahon/Documents/Research/CLAM/splits/task_1_tumor_vs_normal_100_ims1
+Downloading: "https://download.pytorch.org/models/resnet50-0676ba61.pth" to C:\Users\Mahon/.cache\torch\hub\checkpoints\resnet50-0676ba61.pth
+  0%|          | 0.00/97.8M [00:00<?, ?B/s]  1%|1         | 1.00M/97.8M [00:00<00:09, 10.2MB/s]  2%|2         | 2.38M/97.8M [00:00<00:08, 12.4MB/s]  4%|3         | 3.75M/97.8M [00:00<00:07, 13.1MB/s]  5%|5         | 5.12M/97.8M [00:00<00:07, 13.5MB/s]  7%|6         | 6.50M/97.8M [00:00<00:07, 13.7MB/s]  8%|8         | 7.88M/97.8M [00:00<00:06, 13.8MB/s]  9%|9         | 9.25M/97.8M [00:00<00:06, 13.9MB/s] 11%|#         | 10.6M/97.8M [00:00<00:06, 14.0MB/s] 12%|#2        | 12.0M/97.8M [00:00<00:06, 14.0MB/s] 14%|#3        | 13.4M/97.8M [00:01<00:06, 13.9MB/s] 15%|#5        | 14.8M/97.8M [00:01<00:06, 14.0MB/s] 16%|#6        | 16.1M/97.8M [00:01<00:06, 14.0MB/s] 18%|#7        | 17.5M/97.8M [00:01<00:06, 14.0MB/s] 19%|#9        | 18.9M/97.8M [00:01<00:05, 14.0MB/s] 21%|##        | 20.2M/97.8M [00:01<00:05, 14.0MB/s] 22%|##2       | 21.6M/97.8M [00:01<00:05, 13.9MB/s] 24%|##3       | 23.0M/97.8M [00:01<00:05, 14.0MB/s] 25%|##4       | 24.4M/97.8M [00:01<00:05, 14.0MB/s] 26%|##6       | 25.8M/97.8M [00:01<00:05, 14.0MB/s] 28%|##7       | 27.1M/97.8M [00:02<00:05, 13.9MB/s] 29%|##9       | 28.5M/97.8M [00:02<00:05, 14.0MB/s] 31%|###       | 29.9M/97.8M [00:02<00:05, 14.0MB/s] 32%|###1      | 31.2M/97.8M [00:02<00:04, 14.0MB/s] 33%|###3      | 32.6M/97.8M [00:02<00:05, 13.2MB/s] 35%|###4      | 34.0M/97.8M [00:02<00:04, 13.4MB/s] 36%|###6      | 35.4M/97.8M [00:02<00:04, 13.6MB/s] 38%|###7      | 36.8M/97.8M [00:02<00:06, 10.1MB/s] 39%|###8      | 37.9M/97.8M [00:03<00:07, 8.96MB/s] 40%|###9      | 38.9M/97.8M [00:03<00:06, 8.85MB/s] 41%|####1     | 40.2M/97.8M [00:03<00:06, 10.0MB/s] 43%|####2     | 41.6M/97.8M [00:03<00:05, 11.0MB/s] 44%|####3     | 43.0M/97.8M [00:03<00:04, 11.8MB/s] 45%|####5     | 44.4M/97.8M [00:03<00:04, 12.4MB/s] 47%|####6     | 45.8M/97.8M [00:03<00:04, 12.9MB/s] 48%|####8     | 47.1M/97.8M [00:03<00:04, 13.2MB/s] 50%|####9     | 48.5M/97.8M [00:03<00:03, 13.4MB/s] 51%|#####1    | 49.9M/97.8M [00:04<00:03, 13.6MB/s] 52%|#####2    | 51.2M/97.8M [00:04<00:03, 13.7MB/s] 54%|#####3    | 52.6M/97.8M [00:04<00:03, 13.8MB/s] 55%|#####5    | 54.0M/97.8M [00:04<00:03, 13.9MB/s] 57%|#####6    | 55.4M/97.8M [00:04<00:03, 13.9MB/s] 58%|#####8    | 56.8M/97.8M [00:04<00:03, 13.9MB/s] 59%|#####9    | 58.1M/97.8M [00:04<00:03, 12.7MB/s] 61%|######    | 59.5M/97.8M [00:04<00:03, 13.1MB/s] 62%|######2   | 60.9M/97.8M [00:04<00:02, 13.3MB/s] 64%|######3   | 62.2M/97.8M [00:05<00:02, 13.5MB/s] 65%|######5   | 63.6M/97.8M [00:05<00:02, 13.6MB/s] 66%|######6   | 65.0M/97.8M [00:05<00:02, 13.7MB/s] 68%|######7   | 66.4M/97.8M [00:05<00:02, 13.3MB/s] 69%|######9   | 67.8M/97.8M [00:05<00:02, 12.6MB/s] 71%|#######   | 69.1M/97.8M [00:05<00:02, 12.9MB/s] 72%|#######2  | 70.5M/97.8M [00:05<00:02, 13.3MB/s] 74%|#######3  | 71.9M/97.8M [00:05<00:02, 13.5MB/s] 75%|#######4  | 73.2M/97.8M [00:05<00:01, 13.6MB/s] 76%|#######6  | 74.6M/97.8M [00:05<00:01, 13.7MB/s] 78%|#######7  | 76.0M/97.8M [00:06<00:01, 13.8MB/s] 79%|#######9  | 77.4M/97.8M [00:06<00:01, 13.9MB/s] 81%|########  | 78.8M/97.8M [00:06<00:01, 13.9MB/s] 82%|########1 | 80.1M/97.8M [00:06<00:01, 14.0MB/s] 83%|########3 | 81.5M/97.8M [00:06<00:01, 14.0MB/s] 85%|########4 | 82.9M/97.8M [00:06<00:01, 14.0MB/s] 86%|########6 | 84.2M/97.8M [00:06<00:01, 14.0MB/s] 88%|########7 | 85.6M/97.8M [00:06<00:00, 14.0MB/s] 89%|########8 | 87.0M/97.8M [00:06<00:00, 14.0MB/s] 90%|######### | 88.4M/97.8M [00:07<00:00, 14.0MB/s] 92%|#########1| 89.8M/97.8M [00:07<00:00, 14.0MB/s] 93%|#########3| 91.1M/97.8M [00:07<00:00, 14.0MB/s] 95%|#########4| 92.5M/97.8M [00:07<00:00, 14.0MB/s] 96%|#########6| 93.9M/97.8M [00:07<00:00, 14.0MB/s] 97%|#########7| 95.2M/97.8M [00:07<00:00, 14.0MB/s] 99%|#########8| 96.6M/97.8M [00:07<00:00, 14.0MB/s]100%|##########| 97.8M/97.8M [00:07<00:00, 13.3MB/s]
+Starting SSL pretraining...
+Traceback (most recent call last):
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_185750.py", line 809, in <module>
+    results = main(args)
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_185750.py", line 610, in main
+    ssl_pretrain(args, encoder, ssl_pretrain_loader)
+    ~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\Documents\Research\CLAM\experiments\main_experiment_20250619_185750.py", line 539, in ssl_pretrain
+    for batch_idx, (data, _) in enumerate(train_loader):
+                                ~~~~~~~~~^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\dataloader.py", line 733, in __next__
+    data = self._next_data()
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\dataloader.py", line 1515, in _next_data
+    return self._process_data(data, worker_id)
+           ~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\dataloader.py", line 1550, in _process_data
+    data.reraise()
+    ~~~~~~~~~~~~^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\_utils.py", line 750, in reraise
+    raise exception
+RuntimeError: Caught RuntimeError in DataLoader worker process 0.
+Original Traceback (most recent call last):
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\_utils\worker.py", line 349, in _worker_loop
+    data = fetcher.fetch(index)  # type: ignore[possibly-undefined]
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\_utils\fetch.py", line 55, in fetch
+    return self.collate_fn(data)
+           ~~~~~~~~~~~~~~~^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\_utils\collate.py", line 398, in default_collate
+    return collate(batch, collate_fn_map=default_collate_fn_map)
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\_utils\collate.py", line 212, in collate
+    collate(samples, collate_fn_map=collate_fn_map)
+    ~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\_utils\collate.py", line 155, in collate
+    return collate_fn_map[elem_type](batch, collate_fn_map=collate_fn_map)
+           ~~~~~~~~~~~~~~~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\Mahon\AppData\Local\Programs\Python\Python313\Lib\site-packages\torch\utils\data\_utils\collate.py", line 272, in collate_tensor_fn
+    return torch.stack(batch, 0, out=out)
+           ~~~~~~~~~~~^^^^^^^^^^^^^^^^^^^
+RuntimeError: stack expects each tensor to be equal size, but got [1859, 1024] at entry 0 and [4119, 1024] at entry 1
+
