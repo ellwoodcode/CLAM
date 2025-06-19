@@ -72,7 +72,7 @@ def evaluate_all_cohorts(models_exp_code, results_dir, save_exp_prefix, task, mo
             cohort_auc = df['test_auc'].mean()
             cohort_aucs[cohort] = cohort_auc
         else:
-            print(f"⚠️  No summary.csv found for {cohort}")
+            print(f" No summary.csv found for {cohort}")
             cohort_aucs[cohort] = None
 
     valid_aucs = [auc for auc in cohort_aucs.values() if auc is not None]

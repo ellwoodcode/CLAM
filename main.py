@@ -9,7 +9,7 @@ import math
 from utils.file_utils import save_pkl, load_pkl
 from utils.utils import *
 from utils.core_utils import train
-from dataset_modules.dataset_generic import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset_Tangle
+from dataset_modules.dataset_generic import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset
 
 # pytorch imports
 import torch
@@ -154,7 +154,7 @@ print('\nLoad Dataset')
 
 if args.task == 'task_1_tumor_vs_normal':
     args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = 'C:/Users/Mahon/OneDrive/Documents/CLAM/Labels/Textual/labels_ims2_filtered.csv',
+    dataset = Generic_MIL_Dataset(csv_path = 'C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual/labels_ims2_filtered.csv',
                             data_dir= args.data_root_dir,
                             shuffle = False, 
                             seed = args.seed, 

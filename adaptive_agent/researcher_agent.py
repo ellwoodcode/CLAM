@@ -6,7 +6,7 @@ import os
 import json
 from datetime import datetime, timedelta
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = ""
 
 FEEDBACK_LOG = "./feedback_log.json"
 CACHE_PATH = "./research_cache.json"
@@ -58,8 +58,8 @@ def summarize_with_feedback(papers, feedback):
         "- A title\n- A justification\n- Which paper inspired it\n"
     )
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
+    response = openai.chat.completions.create(
+        model="gpt-4.1-2025-04-14",
         messages=[
             {"role": "system", "content": "You are a research analyst specializing in ML generalisability."},
             {"role": "user", "content": text_input}
@@ -67,7 +67,7 @@ def summarize_with_feedback(papers, feedback):
         temperature=0.7,
     )
 
-    return response.choices[0].message["content"]
+    return response.choices[0].message.content
 
 def save_cache(papers):
     with open(CACHE_PATH, "w") as f:

@@ -3,7 +3,7 @@
 import openai
 import os
 
-openai.api_key = os.getenv("OPENAI_API_KEY")
+openai.api_key = ""
 
 def adapt_method_to_wsi(method_text, slide_level=True, feature_based=True):
     """
@@ -24,8 +24,8 @@ def adapt_method_to_wsi(method_text, slide_level=True, feature_based=True):
         "Make sure your spec is useful for a coding agent to implement in PyTorch."
     )
 
-    response = openai.ChatCompletion.create(
-        model="gpt-4o",
+    response = openai.chat.completions.create(
+        model="gpt-4.1-2025-04-14",
         messages=[
             {"role": "system", "content": "You are an ML strategist adapting research to WSI classification using MIL."},
             {"role": "user", "content": context}
@@ -33,7 +33,7 @@ def adapt_method_to_wsi(method_text, slide_level=True, feature_based=True):
         temperature=0.5,
     )
 
-    return response.choices[0].message['content']
+    return response.choices[0].message.content
 
 if __name__ == "__main__":
     test_idea = (
