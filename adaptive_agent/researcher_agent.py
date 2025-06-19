@@ -80,17 +80,17 @@ def load_cache():
     return []
 
 if __name__ == "__main__":
-    print("🔍 Loading feedback log...")
+    print("Loading feedback log...")
     feedback = load_feedback()
 
-    print("📚 Fetching recent arXiv papers...")
+    print("Fetching recent arXiv papers...")
     papers = fetch_recent_arxiv_papers()
 
-    print("🧠 Summarizing papers with respect to past failures...")
+    print("Summarizing papers with respect to past failures...")
     summary = summarize_with_feedback(papers, feedback)
 
-    print("✅ Summary generated:\n")
+    print("Summary generated:\n")
     print(summary)
 
-    print("💾 Caching papers...")
+    print("Caching papers...")
     save_cache(papers)

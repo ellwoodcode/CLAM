@@ -78,10 +78,21 @@ def _extract_failure_excerpt(log_lines):
 
 
 def run_script_and_log(script_path):
+    cmd = [
+        "python", script_path,
+        "--task", DEFAULT_TASK,
+        "--data_root_dir", DEFAULT_DATA_ROOT,
+        "--results_dir", DEFAULT_RESULTS_DIR,
+        "--model_type", DEFAULT_MODEL_TYPE,
+        "--embed_dim", DEFAULT_EMBED_DIM,
+        "--k", DEFAULT_K,
+        "--exp_code", "autogen_exp",
+    ]
+
     log_path = get_log_filename(script_path)
     with open(log_path, "w") as logfile:
         process = subprocess.run(
-            ["python", script_path],
+            cmd,
             stdout=logfile,
             stderr=subprocess.STDOUT,
             timeout=None  # Remove timeouts due to model training

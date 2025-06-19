@@ -63,7 +63,7 @@ def evaluate_all_cohorts(models_exp_code, results_dir, save_exp_prefix, task, mo
 
         result = subprocess.run(cmd)
         if result.returncode != 0:
-            print(f"❌ ERROR during eval for {save_exp_code}")
+            print(f"ERROR during eval for {save_exp_code}")
             continue
 
         summary_path = os.path.join("eval_results", f"EVAL_{save_exp_code}", "summary.csv")

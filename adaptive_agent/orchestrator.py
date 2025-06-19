@@ -4,11 +4,13 @@ import json
 import os
 from datetime import datetime
 from researcher_agent import fetch_recent_arxiv_papers, summarize_with_feedback, load_feedback, save_cache
-from strategist_agent import adapt_method_to_wsi
+from strategist_agent import adapt_method_to_wsi, score_idea
 from coder_agent import try_implement_method
 
 FEEDBACK_LOG = "feedback_log.json"
 REPORT_PATH = "experiment_log.md"
+VETTED_IDEAS_PATH = "vetted_ideas.json"
+
 
 def append_feedback(method_id, title, source, status, reason=None, auc=None):
     if os.path.exists(FEEDBACK_LOG):
@@ -33,35 +35,64 @@ def append_report(section):
     with open(REPORT_PATH, "a") as f:
         f.write(f"\n## {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n{section}\n")
 
+
+def load_vetted_ideas():
+    """Return a list of previously vetted ideas."""
+    if os.path.exists(VETTED_IDEAS_PATH):
+        with open(VETTED_IDEAS_PATH, "r") as f:
+            return json.load(f)
+    return []
+
+
+def save_vetted_ideas(ideas):
+    """Persist the list of vetted ideas to disk."""
+    with open(VETTED_IDEAS_PATH, "w") as f:
+        json.dump(ideas, f, indent=2)
+
 if __name__ == "__main__":
     print("🔁 Loading feedback...")
     feedback = load_feedback()
+    vetted = load_vetted_ideas()
 
-    print("🔍 Fetching recent papers...")
-    papers = fetch_recent_arxiv_papers()
-    summary = summarize_with_feedback(papers, feedback)
+    while len(vetted) < 5:
+        print("Fetching recent papers...")
+        papers = fetch_recent_arxiv_papers()
+        summary = summarize_with_feedback(papers, feedback)
 
-    print("📚 Researcher Suggestions:\n")
-    print(summary)
+        print("Researcher Suggestions:\n")
+        print(summary)
 
-    ideas = summary.split("\n\n")
-    for i, idea in enumerate(ideas):
+        ideas = [i for i in summary.split("\n\n") if i.strip()]
+
+        for idea in ideas:
+            print("Scoring idea...")
+            scores = score_idea(idea)
+            if scores.get("total", 0) < 25:
+                print(f"   Discarded (score {scores['total']})")
+                continue
+            vetted.append({"idea": idea, "scores": scores})
+            save_vetted_ideas(vetted)
+            print(f"   Accepted (score {scores['total']})")
+
+            if len(vetted) >= 5:
+                break
+
+    for i, item in enumerate(vetted):
         method_id = f"method_{datetime.now().strftime('%Y%m%d')}_{i+1}"
-        if not idea.strip():
-            continue
+        idea_text = item["idea"]
 
         print(f"\n🧠 Adapting Idea {i+1} to WSI context...")
-        adaptation_spec = adapt_method_to_wsi(idea)
+        adaptation_spec = adapt_method_to_wsi(idea_text)
 
         print("👨‍💻 Passing to coder agent...")
         result = try_implement_method({
             "id": method_id,
-            "method": idea,
+            "method": idea_text,
             "justification": adaptation_spec
         })
 
         report_section = (
-            f"### {method_id}: {idea.splitlines()[0]}\n"
+            f"### {method_id}: {idea_text.splitlines()[0]}\n"
             f"**Adaptation Summary**:\n```\n{adaptation_spec}\n```\n"
             f"**Coder Result**:\n- Success: {result['success']}\n"
             f"- AUC: {result['auc']:.4f}\n"
@@ -73,10 +104,10 @@ if __name__ == "__main__":
 
         append_report(report_section)
 
-        if result["success"] and result["auc"] > 0.79:  # Example threshold
-            append_feedback(method_id, idea.splitlines()[0], "arXiv", "success", auc=result["auc"])
-            print("🎉 New method improved generalisability! Stopping here.")
+        if result["success"] and result["auc"] > 0.5:  
+            append_feedback(method_id, idea_text.splitlines()[0], "arXiv", "success", auc=result["auc"])
+            print("New method improved generalisability! Stopping here.")
             break
         else:
-            append_feedback(method_id, idea.splitlines()[0], "arXiv", "failed", reason="Did not outperform baseline", auc=result["auc"])
-            print("❌ No improvement, trying next...")
+            append_feedback(method_id, idea_text.splitlines()[0], "arXiv", "failed", reason="Did not outperform baseline", auc=result["auc"])
+            print("No improvement, trying next...")

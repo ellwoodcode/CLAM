@@ -2,6 +2,7 @@
 
 import openai
 import os
+import json
 
 openai.api_key = ""
 
@@ -34,6 +35,44 @@ def adapt_method_to_wsi(method_text, slide_level=True, feature_based=True):
     )
 
     return response.choices[0].message.content
+
+
+def score_idea(idea_text):
+    """Score an idea for novelty, potential impact and ease of implementation.
+
+    The function asks GPT to rate the idea on three criteria from 0–10 and
+    returns a dictionary with the individual scores and their sum.
+    """
+
+    prompt = (
+        "You are an expert research strategist. For the idea below, return a JSON "
+        "object with integer fields 'novelty', 'potential', 'ease' (each 0-10) "
+        "and 'total' which is the sum. Only return the JSON.\n\n"
+        f"Idea:\n{idea_text}"
+    )
+
+    response = openai.chat.completions.create(
+        model="gpt-4.1-2025-04-14",
+        messages=[
+            {"role": "system", "content": "You evaluate research ideas."},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.2,
+    )
+
+    try:
+        scores = json.loads(response.choices[0].message.content)
+        scores = {
+            "novelty": int(scores.get("novelty", 0)),
+            "potential": int(scores.get("potential", 0)),
+            "ease": int(scores.get("ease", 0)),
+        }
+    except Exception:
+        scores = {"novelty": 0, "potential": 0, "ease": 0}
+
+    scores["total"] = scores["novelty"] + scores["potential"] + scores["ease"]
+    return scores
+
 
 if __name__ == "__main__":
     test_idea = (
