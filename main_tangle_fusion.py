@@ -7,13 +7,23 @@ import pandas as pd
 
 # internal imports
 from utils.file_utils import save_pkl
-from utils.utils import seed_torch
 from utils.core_utils_tangle import train
 from dataset_modules.dataset_generic_tangle import Generic_MIL_Dataset_Tangle
 
 # pytorch imports
 import torch
 
+def seed_torch(seed=7):
+    import random
+    random.seed(seed)
+    os.environ['PYTHONHASHSEED'] = str(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    if device.type == 'cuda':
+        torch.cuda.manual_seed(seed)
+        torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+    torch.backends.cudnn.benchmark = False
+    torch.backends.cudnn.deterministic = True
 
 def main(args):
     if not os.path.isdir(args.results_dir):
@@ -102,6 +112,8 @@ def parse_args():
     parser.add_argument('--bag_weight', type=float, default=0.7)
     parser.add_argument('--B', type=int, default=8)
     args = parser.parse_args()
+    args.use_tangle_fusion = True
+    args.use_tangle_concatenation = False
     return args
 
 
@@ -113,7 +125,7 @@ def prepare_dataset(args):
 
     if args.task == 'task_1_tumor_vs_normal':
         args.n_classes = 2
-        csv_path = 'dataset_csv/labels_ims1_filtered.csv'
+        csv_path = 'C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual/labels_ims1_filtered.csv'
         dataset = Generic_MIL_Dataset_Tangle(
             csv_path=csv_path,
             data_dir=args.data_root_dir,

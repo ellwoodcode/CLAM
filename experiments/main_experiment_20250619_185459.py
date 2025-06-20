@@ -613,7 +613,8 @@ def ssl_pretrain(args, encoder, train_loader):
         total_loss = 0.0
         print("entering epoch")
         for batch_idx, data in enumerate(train_loader):
-            print(f"batch {batch_idx}")
+            if (batch_idx%1000 == 0):
+                print(f"batch {batch_idx}")
             data = data.to(device)
             optimizer.zero_grad()
             x_i = feature_augment(data)
@@ -704,8 +705,6 @@ def main(args, dataset):
 def get_ssl_loader(dataset, batch_size):
     patch_dataset = PatchFeatureDataset(dataset)
     return DataLoader(patch_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
-    patch_dataset = PatchFeatureDataset(dataset)
-    return DataLoader(patch_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
 class MLPEncoder(nn.Module):
     """Simple MLP used for SSL on patch features."""
@@ -718,9 +717,6 @@ class MLPEncoder(nn.Module):
         )
 
     def forward(self, x):
-        h = self.fc(x)
-        z = self.projector(h)
-        return z, h
         h = self.fc(x)
         z = self.projector(h)
         return z, h
