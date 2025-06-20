@@ -11,7 +11,20 @@ import math
 # internal imports
 from utils.file_utils import save_pkl, load_pkl
 from utils.utils import *
-from utils.core_utils import save_splits, MIL_fc, MIL_fc_mc, EarlyStopping, Accuracy_Logger, summary, roc_auc_score, label_binarize, roc_curve, calc_auc
+from utils.core_utils import (
+    save_splits,
+    MIL_fc,
+    MIL_fc_mc,
+    EarlyStopping,
+    Accuracy_Logger,
+    summary,
+    roc_auc_score,
+    label_binarize,
+    roc_curve,
+    calc_auc,
+    train_loop_clam,
+    validate_clam,
+)
 from dataset_modules.dataset_generic import Generic_WSI_Classification_Dataset, Generic_MIL_Dataset
 
 # pytorch imports
@@ -621,8 +634,13 @@ parser.add_argument('--opt', type=str, choices = ['adam', 'sgd'], default='adam'
 parser.add_argument('--drop_out', type=float, default=0.25, help='dropout')
 parser.add_argument('--bag_loss', type=str, choices=['svm', 'ce'], default='ce',
                      help='slide-level classification loss function (default: ce)')
-parser.add_argument('--model_type', type=str, choices=['clam_sb', 'clam_mb', 'mil', 'multi_scale_attention'], default='clam_sb', 
-                    help='type of model (default: clam_sb, clam w/ single attention branch)')
+parser.add_argument(
+    '--model_type',
+    type=str,
+    choices=['clam_sb', 'clam_mb', 'mil', 'multi_scale_attention'],
+    default='multi_scale_attention',
+    help='type of model (default: multi_scale_attention)'
+)
 parser.add_argument('--exp_code', type=str, help='experiment code for saving results')
 parser.add_argument('--weighted_sample', action='store_true', default=False, help='enable weighted sampling')
 parser.add_argument('--model_size', type=str, choices=['small', 'big'], default='small', help='size of model, does not affect mil')

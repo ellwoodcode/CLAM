@@ -263,11 +263,11 @@ class SSLDataset(torch.utils.data.Dataset):
         return data
 
 class SSLModel(nn.Module):
-    def __init__(self, encoder, projection_dim=128):
+    def __init__(self, encoder, feature_dim, projection_dim=128):
         super(SSLModel, self).__init__()
         self.encoder = encoder
         self.projection_head = nn.Sequential(
-            nn.Linear(encoder.fc.in_features, 512),
+            nn.Linear(feature_dim, 512),
             nn.ReLU(),
             nn.Linear(512, projection_dim)
         )
@@ -301,8 +301,9 @@ def ssl_pretrain(args):
     dataloader = DataLoader(dataset, batch_size=args.ssl_batch_size, shuffle=True)
 
     encoder = models.resnet18(pretrained=False)  # Corrected to use models from torchvision
+    feature_dim = encoder.fc.in_features
     encoder.fc = nn.Identity()
-    model = SSLModel(encoder).to(device)
+    model = SSLModel(encoder, feature_dim).to(device)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=args.ssl_lr)
 

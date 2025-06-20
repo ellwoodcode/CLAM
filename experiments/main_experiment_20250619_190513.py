@@ -265,17 +265,19 @@ class Generic_MIL_Dataset_Custom(Generic_MIL_Dataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
-def compute_slide_difficulty(model, loader, n_classes):
+def compute_slide_difficulty(model, dataset):
+    """Compute loss per slide to determine curriculum order."""
     model.eval()
     slide_difficulty = {}
     with torch.inference_mode():
-        for data, label in loader:
-            data, label = data.to(device), label.to(device)
+        for idx in range(len(dataset)):
+            data, label = dataset[idx]
+            data = data.to(device)
+            label = torch.tensor([label], device=device)
             logits, _, _, _, _ = model(data)
-            loss = F.cross_entropy(logits, label, reduction='none')
-            for i, l in enumerate(loss):
-                slide_id = loader.dataset.get_slide_id(i)
-                slide_difficulty[slide_id] = l.item()
+            loss = F.cross_entropy(logits, label)
+            slide_id = dataset.get_slide_id(idx)
+            slide_difficulty[slide_id] = loss.item()
     return slide_difficulty
 
 def curriculum_select(slide_difficulty, epoch, curriculum_schedule):
@@ -284,15 +286,17 @@ def curriculum_select(slide_difficulty, epoch, curriculum_schedule):
     selected_slides = [slide_id for slide_id, _ in sorted_slides[:int(len(sorted_slides) * threshold / 100)]]
     return selected_slides
 
-def infer_patch_labels(model, loader):
+def infer_patch_labels(model, dataset):
+    """Generate pseudo patch labels using the model's attention scores."""
     model.eval()
     pseudo_labels = {}
     with torch.inference_mode():
-        for data, _ in loader:
+        for idx in range(len(dataset)):
+            data, _ = dataset[idx]
             data = data.to(device)
-            _, patch_preds, _, _, _ = model(data, attention_only=True)
+            patch_preds = model(data, attention_only=True)
             patch_preds = patch_preds.cpu().numpy()
-            slide_id = loader.dataset.get_slide_id(0)
+            slide_id = dataset.get_slide_id(idx)
             pseudo_labels[slide_id] = (patch_preds > 0.5).astype(int).tolist()
     return pseudo_labels
 
@@ -388,7 +392,7 @@ def train(datasets, cur, args):
         early_stopping = None
     print('Done!')
 
-    slide_difficulty = compute_slide_difficulty(model, train_loader, args.n_classes)
+    slide_difficulty = compute_slide_difficulty(model, train_split)
     pseudo_labels = {}
 
     for epoch in range(args.max_epochs):
@@ -404,9 +408,9 @@ def train(datasets, cur, args):
             break
 
         if epoch % args.label_refine_interval == 0 and epoch > 0:
-            pseudo_labels = infer_patch_labels(model, train_loader)
+            pseudo_labels = infer_patch_labels(model, train_split)
 
-        slide_difficulty = compute_slide_difficulty(model, train_loader, args.n_classes)
+        slide_difficulty = compute_slide_difficulty(model, train_split)
 
     if args.early_stopping:
         model.load_state_dict(torch.load(os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur))))
@@ -434,7 +438,7 @@ def train(datasets, cur, args):
         writer.close()
     return results_dict, test_auc, val_auc, 1-test_error, 1-val_error 
 
-def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writer = None, loss_fn = None, pseudo_labels=None, patch_loss_weight=0.1):
+def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writer=None, loss_fn=None, pseudo_labels=None, patch_loss_weight=0.1):
     model.train()
     acc_logger = Accuracy_Logger(n_classes=n_classes)
     inst_logger = Accuracy_Logger(n_classes=n_classes)
@@ -445,6 +449,7 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
     inst_count = 0
 
     print('\n')
+    sampler_indices = list(loader.sampler)
     for batch_idx, (data, label) in enumerate(loader):
         data, label = data.to(device), label.to(device)
         logits, Y_prob, Y_hat, _, instance_dict = model(data, label=label, instance_eval=True)
@@ -459,11 +464,12 @@ def train_loop_clam(epoch, model, loader, optimizer, n_classes, bag_weight, writ
         train_inst_loss += instance_loss_value
         
         if pseudo_labels:
-            slide_id = loader.dataset.get_slide_id(batch_idx)
-            patch_loss = F.cross_entropy(instance_dict['inst_preds'], torch.tensor(pseudo_labels[slide_id]).to(device))
-            total_loss = loss + patch_loss_weight * patch_loss
+            dataset_idx = sampler_indices[batch_idx]
+            slide_id = loader.dataset.get_slide_id(dataset_idx)
+            # Placeholder: patch-level loss not implemented reliably
+            total_loss = bag_weight * loss + (1 - bag_weight) * instance_loss
         else:
-            total_loss = bag_weight * loss + (1-bag_weight) * instance_loss 
+            total_loss = bag_weight * loss + (1 - bag_weight) * instance_loss
 
         inst_preds = instance_dict['inst_preds']
         inst_labels = instance_dict['inst_labels']

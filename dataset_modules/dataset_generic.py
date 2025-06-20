@@ -350,6 +350,9 @@ class Generic_MIL_Dataset(Generic_WSI_Classification_Dataset):
 
 			features = torch.from_numpy(features)
 			return features, label, coords
+		
+	def get_slide_id(self, idx):
+		return self.slide_data["slide_id"].iloc[idx]
 
 class Generic_MIL_Dataset_Tangle(Generic_MIL_Dataset):
     def __init__(self, tangle_feature_dir=None, *args, **kwargs):
@@ -385,5 +388,6 @@ class Generic_Split(Generic_MIL_Dataset):
 	def __len__(self):
 		return len(self.slide_data)
 		
-
+	def get_slide_id(self, idx):
+		return self.slide_data["slide_id"].iloc[idx]
 
