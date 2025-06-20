@@ -17,6 +17,7 @@ from dataset_modules.dataset_generic import Generic_WSI_Classification_Dataset, 
 # pytorch imports
 import torch
 from torch.utils.data import DataLoader, sampler, Dataset
+from torch.utils.data import DataLoader, sampler, Dataset
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
@@ -265,6 +266,26 @@ class PatchFeatureDataset(Dataset):
         data = torch.load(path, map_location='cpu')
         return data[i].float()
 
+class PatchFeatureDataset(Dataset):
+    """Dataset yielding individual patch-level features for SSL."""
+    def __init__(self, slide_dataset):
+        self.samples = []
+        feature_dir = os.path.join(slide_dataset.data_dir, 'pt_files')
+        for slide_id in slide_dataset.slide_data['slide_id']:
+            path = os.path.join(feature_dir, f"{slide_id}.pt")
+            if os.path.isfile(path):
+                data = torch.load(path, map_location='cpu')
+                for i in range(data.size(0)):
+                    self.samples.append((path, i))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        path, i = self.samples[idx]
+        data = torch.load(path, map_location='cpu')
+        return data[i].float()
+
 def train(datasets, cur, args):
     """   
         train for a single fold
@@ -338,6 +359,18 @@ def train(datasets, cur, args):
     _ = model.to(device)
     print('Done!')
     print_network(model)
+
+    if args.ssl_pretrain:
+        encoder_weights = torch.load(os.path.join(args.results_dir, "ssl_pretrained_encoder.pth"))
+        encoder = MLPEncoder(args.embed_dim, 512, args.ssl_proj_dim)
+        encoder.load_state_dict(encoder_weights)
+        if args.freeze_encoder:
+            for param in encoder.parameters():
+                param.requires_grad = False
+        # copy encoder fc weights to model
+        with torch.no_grad():
+            model.attention_net[0].weight.copy_(encoder.fc.weight)
+            model.attention_net[0].bias.copy_(encoder.fc.bias)
 
     if args.ssl_pretrain:
         encoder_weights = torch.load(os.path.join(args.results_dir, "ssl_pretrained_encoder.pth"))
@@ -571,6 +604,11 @@ def ssl_pretrain(args, encoder, train_loader):
         noise = torch.randn_like(x) * 0.1
         return F.dropout(x + noise, p=0.2, training=True)
 
+
+    def feature_augment(x):
+        noise = torch.randn_like(x) * 0.1
+        return F.dropout(x + noise, p=0.2, training=True)
+
     for epoch in range(args.ssl_epochs):
         total_loss = 0.0
         print("entering epoch")
@@ -582,11 +620,16 @@ def ssl_pretrain(args, encoder, train_loader):
             x_j = feature_augment(data)
             z_i, _ = encoder(x_i)
             z_j, _ = encoder(x_j)
+            x_i = feature_augment(data)
+            x_j = feature_augment(data)
+            z_i, _ = encoder(x_i)
+            z_j, _ = encoder(x_j)
             loss = contrastive_loss(z_i, z_j, args.ssl_temp)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
         print(f"Epoch [{epoch+1}/{args.ssl_epochs}], Loss: {total_loss/len(train_loader):.4f}")
+
 
     torch.save(encoder.state_dict(), os.path.join(args.results_dir, "ssl_pretrained_encoder.pth"))
     print("SSL pretraining completed.")
@@ -609,7 +652,7 @@ def contrastive_loss(z_i, z_j, temperature):
     logits = logits / temperature
     return F.cross_entropy(logits, labels)
 
-def main(args, dataset):
+def main(args, dataset, dataset):
     # create results directory if necessary
     if not os.path.isdir(args.results_dir):
         os.mkdir(args.results_dir)
@@ -661,7 +704,15 @@ def main(args, dataset):
 def get_ssl_loader(dataset, batch_size):
     patch_dataset = PatchFeatureDataset(dataset)
     return DataLoader(patch_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    patch_dataset = PatchFeatureDataset(dataset)
+    return DataLoader(patch_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
+class MLPEncoder(nn.Module):
+    """Simple MLP used for SSL on patch features."""
+    def __init__(self, embed_dim, hidden_dim, proj_dim):
+        super().__init__()
+        self.fc = nn.Linear(embed_dim, hidden_dim)
+        self.projector = nn.Sequential(
 class MLPEncoder(nn.Module):
     """Simple MLP used for SSL on patch features."""
     def __init__(self, embed_dim, hidden_dim, proj_dim):
@@ -673,6 +724,9 @@ class MLPEncoder(nn.Module):
         )
 
     def forward(self, x):
+        h = self.fc(x)
+        z = self.projector(h)
+        return z, h
         h = self.fc(x)
         z = self.projector(h)
         return z, h
@@ -741,11 +795,13 @@ def seed_torch(seed=7):
     torch.manual_seed(seed)
     if device.type == 'cuda':
         torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
+        torch.cuda.manual_seed_all(seed)   # if you are using multi-GPU.
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
 if __name__ == "__main__":
+    args = parser.parse_args()
+    if __name__ == "__main__":
     args = parser.parse_args()
     seed_torch(args.seed)
 
@@ -769,12 +825,46 @@ if __name__ == "__main__":
         'weighted_sample': args.weighted_sample,
         'opt': args.opt,
     }
+    encoding_size = 1024
+    settings = {
+        'num_splits': args.k,
+        'k_start': args.k_start,
+        'k_end': args.k_end,
+        'task': args.task,
+        'max_epochs': args.max_epochs,
+        'results_dir': args.results_dir,
+        'lr': args.lr,
+        'experiment': args.exp_code,
+        'reg': args.reg,
+        'label_frac': args.label_frac,
+        'bag_loss': args.bag_loss,
+        'seed': args.seed,
+        'model_type': args.model_type,
+        'model_size': args.model_size,
+        "use_drop_out": args.drop_out,
+        'weighted_sample': args.weighted_sample,
+        'opt': args.opt,
+    }
 
     if args.model_type in ['clam_sb', 'clam_mb']:
         settings.update({'bag_weight': args.bag_weight, 'inst_loss': args.inst_loss, 'B': args.B})
+    if args.model_type in ['clam_sb', 'clam_mb']:
+        settings.update({'bag_weight': args.bag_weight, 'inst_loss': args.inst_loss, 'B': args.B})
 
-    print('\nLoad Dataset')
+        print('\nLoad Dataset')
 
+    if args.task == 'task_1_tumor_vs_normal':
+        args.n_classes = 2
+        dataset = Generic_MIL_Dataset(
+            csv_path='C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual/labels_ims1_filtered.csv',
+            data_dir=args.data_root_dir,
+            shuffle=False,
+            seed=args.seed,
+            print_info=True,
+            label_dict={'normal_tissue': 0, 'tumor_tissue': 1},
+            patient_strat=False,
+            ignore=[],
+        )
     if args.task == 'task_1_tumor_vs_normal':
         args.n_classes = 2
         dataset = Generic_MIL_Dataset(
@@ -809,23 +899,40 @@ if __name__ == "__main__":
 
     if not os.path.isdir(args.results_dir):
         os.mkdir(args.results_dir)
+        if args.model_type in ['clam_sb', 'clam_mb']:
+            assert args.subtyping
+
+    else:
+        raise NotImplementedError
+
+    if not os.path.isdir(args.results_dir):
+        os.mkdir(args.results_dir)
 
     args.results_dir = os.path.join(args.results_dir, str(args.exp_code) + f'_s{args.seed}')
     if not os.path.isdir(args.results_dir):
         os.mkdir(args.results_dir)
+    args.results_dir = os.path.join(args.results_dir, str(args.exp_code) + f'_s{args.seed}')
+    if not os.path.isdir(args.results_dir):
+        os.mkdir(args.results_dir)
 
-    print('split_dir: ', args.split_dir)
-    assert os.path.isdir(args.split_dir)
+        print('split_dir: ', args.split_dir)
+        assert os.path.isdir(args.split_dir)
 
-    settings.update({'split_dir': args.split_dir})
+        settings.update({'split_dir': args.split_dir})
 
+    with open(args.results_dir + f'/experiment_{args.exp_code}.txt', 'w') as f:
+        print(settings, file=f)
     with open(args.results_dir + f'/experiment_{args.exp_code}.txt', 'w') as f:
         print(settings, file=f)
 
     print("################# Settings ###################")
     for key, val in settings.items():
         print(f"{key}:  {val}")
+    print("################# Settings ###################")
+    for key, val in settings.items():
+        print(f"{key}:  {val}")
 
+    results = main(args, dataset)
     results = main(args, dataset)
     print("finished!")
     print("end script")

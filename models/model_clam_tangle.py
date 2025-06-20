@@ -4,6 +4,26 @@ import torch.nn.functional as F
 import numpy as np
 import pdb
 
+
+class CrossModalFusion(nn.Module):
+    """Simple fusion module for patch and Tangle features."""
+
+    def __init__(self, patch_dim: int, tangle_dim: int, fused_dim: int = None):
+        super().__init__()
+        if fused_dim is None:
+            fused_dim = patch_dim
+
+        self.fc = nn.Sequential(
+            nn.Linear(patch_dim + tangle_dim, fused_dim),
+            nn.ReLU(),
+            nn.Linear(fused_dim, fused_dim),
+        )
+
+    def forward(self, patch_feats: torch.Tensor, tangle_feat: torch.Tensor) -> torch.Tensor:
+        expanded = tangle_feat.unsqueeze(0).expand(patch_feats.size(0), -1)
+        fused = torch.cat([patch_feats, expanded], dim=1)
+        return self.fc(fused)
+
 """
 Attention Network without Gating (2 fc layers)
 args:
@@ -75,8 +95,9 @@ args:
     subtyping: whether it's a subtyping problem
 """
 class CLAM_SB_Tangle(nn.Module):
-    def __init__(self, gate = True, size_arg = "small", dropout = 0., k_sample=8, n_classes=2,
-        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=2048):
+    def __init__(self, gate=True, size_arg="small", dropout=0., k_sample=8, n_classes=2,
+                 instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=2048,
+                 use_fusion: bool = False, tangle_dim: int = None):
         super().__init__()
         self.size_dict = {"small": [embed_dim, 512, 256], "big": [embed_dim, 512, 384]}
         size = self.size_dict[size_arg]
@@ -94,6 +115,11 @@ class CLAM_SB_Tangle(nn.Module):
         self.instance_loss_fn = instance_loss_fn
         self.n_classes = n_classes
         self.subtyping = subtyping
+
+        self.use_fusion = use_fusion
+        if self.use_fusion:
+            assert tangle_dim is not None, "tangle_dim must be provided when using fusion"
+            self.fusion = CrossModalFusion(embed_dim, tangle_dim, embed_dim)
     
     @staticmethod
     def create_positive_targets(length, device):
@@ -135,11 +161,14 @@ class CLAM_SB_Tangle(nn.Module):
         instance_loss = self.instance_loss_fn(logits, p_targets)
         return instance_loss, p_preds, p_targets
 
-    def forward(self, h, tangle_feat = None, label=None, instance_eval=False, return_features=False, attention_only=False):
+    def forward(self, h, tangle_feat=None, label=None, instance_eval=False, return_features=False, attention_only=False):
         if tangle_feat is not None:
             tangle_feat = tangle_feat.to(h.device)
-            tangle_feat_expanded = tangle_feat.unsqueeze(0).repeat(h.size(0), 1)
-            h = torch.cat([h, tangle_feat_expanded], dim=1)
+            if self.use_fusion:
+                h = self.fusion(h, tangle_feat)
+            else:
+                tangle_feat_expanded = tangle_feat.unsqueeze(0).repeat(h.size(0), 1)
+                h = torch.cat([h, tangle_feat_expanded], dim=1)
 
         A, h = self.attention_net(h)  # NxK        
         A = torch.transpose(A, 1, 0)  # KxN
@@ -186,8 +215,9 @@ class CLAM_SB_Tangle(nn.Module):
         return logits, Y_prob, Y_hat, A_raw, results_dict
 
 class CLAM_MB_Tangle(CLAM_SB_Tangle):
-    def __init__(self, gate = True, size_arg = "small", dropout = 0., k_sample=8, n_classes=2,
-        instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=2048):
+    def __init__(self, gate=True, size_arg="small", dropout=0., k_sample=8, n_classes=2,
+                 instance_loss_fn=nn.CrossEntropyLoss(), subtyping=False, embed_dim=2048,
+                 use_fusion: bool = False, tangle_dim: int = None):
         nn.Module.__init__(self)
         self.size_dict = {"small": [embed_dim, 512, 256], "big": [embed_dim, 512, 384]}
         size = self.size_dict[size_arg]
@@ -207,11 +237,19 @@ class CLAM_MB_Tangle(CLAM_SB_Tangle):
         self.n_classes = n_classes
         self.subtyping = subtyping
 
-    def forward(self, h, tangle_feat = None, label=None, instance_eval=False, return_features=False, attention_only=False):
+        self.use_fusion = use_fusion
+        if self.use_fusion:
+            assert tangle_dim is not None, "tangle_dim must be provided when using fusion"
+            self.fusion = CrossModalFusion(embed_dim, tangle_dim, embed_dim)
+
+    def forward(self, h, tangle_feat=None, label=None, instance_eval=False, return_features=False, attention_only=False):
         if tangle_feat is not None:
             tangle_feat = tangle_feat.to(h.device)
-            tangle_feat_expanded = tangle_feat.unsqueeze(0).repeat(h.size(0), 1)
-            h = torch.cat([h, tangle_feat_expanded], dim=1)
+            if self.use_fusion:
+                h = self.fusion(h, tangle_feat)
+            else:
+                tangle_feat_expanded = tangle_feat.unsqueeze(0).repeat(h.size(0), 1)
+                h = torch.cat([h, tangle_feat_expanded], dim=1)
         
         A, h = self.attention_net(h)  # NxK        
         A = torch.transpose(A, 1, 0)  # KxN

@@ -128,9 +128,12 @@ def train(datasets, cur, args):
     print('Done!')
     
     print('\nInit Model...', end=' ')
-    model_dict = {"dropout": args.drop_out, 
-                  'n_classes': args.n_classes, 
+    model_dict = {"dropout": args.drop_out,
+                  'n_classes': args.n_classes,
                   "embed_dim": args.embed_dim}
+
+    if args.use_tangle_fusion:
+        model_dict.update({"use_fusion": True, "tangle_dim": args.tangle_embedding_dim})
     
     if args.model_size is not None and args.model_type != 'mil':
         model_dict.update({"size_arg": args.model_size})
@@ -174,8 +177,8 @@ def train(datasets, cur, args):
     print('\nInit Loaders...', end=' ')
     from torch.utils.data import DataLoader
 
-    # Use tangle_collate only if tangle concatenation is enabled
-    collate_fn = tangle_collate if args.use_tangle_concatenation else None
+    # Use tangle_collate when either concatenation or fusion is enabled
+    collate_fn = tangle_collate if (args.use_tangle_concatenation or args.use_tangle_fusion) else None
 
     train_loader = DataLoader(train_split, batch_size=1, shuffle=True, collate_fn=collate_fn)
     val_loader = DataLoader(val_split, batch_size=1, shuffle=False, collate_fn=collate_fn)
@@ -190,16 +193,18 @@ def train(datasets, cur, args):
         early_stopping = None
     print('Done!')
 
+    use_tangle = args.use_tangle_concatenation or args.use_tangle_fusion
+
     for epoch in range(args.max_epochs):
-        if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:     
-            train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn, args.use_tangle_concatenation)
-            stop = validate_clam(cur, epoch, model, val_loader, args.n_classes, 
-                early_stopping, writer, loss_fn, args.results_dir, args.use_tangle_concatenation)
+        if args.model_type in ['clam_sb', 'clam_mb'] and not args.no_inst_cluster:
+            train_loop_clam(epoch, model, train_loader, optimizer, args.n_classes, args.bag_weight, writer, loss_fn, use_tangle)
+            stop = validate_clam(cur, epoch, model, val_loader, args.n_classes,
+                early_stopping, writer, loss_fn, args.results_dir, use_tangle)
         
         else:
-            train_loop(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn, args.use_tangle_concatenation)
-            stop = validate(cur, epoch, model, val_loader, args.n_classes, 
-                early_stopping, writer, loss_fn, args.results_dir, args.use_tangle_concatenation)
+            train_loop(epoch, model, train_loader, optimizer, args.n_classes, writer, loss_fn, use_tangle)
+            stop = validate(cur, epoch, model, val_loader, args.n_classes,
+                early_stopping, writer, loss_fn, args.results_dir, use_tangle)
         
         if stop: 
             break
@@ -209,10 +214,10 @@ def train(datasets, cur, args):
     else:
         torch.save(model.state_dict(), os.path.join(args.results_dir, "s_{}_checkpoint.pt".format(cur)))
 
-    _, val_error, val_auc, _= summary(model, val_loader, args.n_classes, args.use_tangle_concatenation)
+    _, val_error, val_auc, _= summary(model, val_loader, args.n_classes, use_tangle)
     print('Val error: {:.4f}, ROC AUC: {:.4f}'.format(val_error, val_auc))
 
-    results_dict, test_error, test_auc, acc_logger = summary(model, test_loader, args.n_classes, args.use_tangle_concatenation)
+    results_dict, test_error, test_auc, acc_logger = summary(model, test_loader, args.n_classes, use_tangle)
     print('Test error: {:.4f}, ROC AUC: {:.4f}'.format(test_error, test_auc))
 
     for i in range(args.n_classes):
