@@ -16,7 +16,7 @@ from dataset_modules.dataset_generic import Generic_WSI_Classification_Dataset, 
 
 # pytorch imports
 import torch
-from torch.utils.data import DataLoader, sampler
+from torch.utils.data import DataLoader, sampler, Dataset
 import torch.nn as nn
 import torch.nn.functional as F
 from torchvision import transforms
@@ -245,6 +245,26 @@ class Generic_MIL_Dataset_Custom(Generic_MIL_Dataset):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
 
+class PatchFeatureDataset(Dataset):
+    """Dataset yielding individual patch-level features for SSL."""
+    def __init__(self, slide_dataset):
+        self.samples = []
+        feature_dir = os.path.join(slide_dataset.data_dir, 'pt_files')
+        for slide_id in slide_dataset.slide_data['slide_id']:
+            path = os.path.join(feature_dir, f"{slide_id}.pt")
+            if os.path.isfile(path):
+                data = torch.load(path, map_location='cpu')
+                for i in range(data.size(0)):
+                    self.samples.append((path, i))
+
+    def __len__(self):
+        return len(self.samples)
+
+    def __getitem__(self, idx):
+        path, i = self.samples[idx]
+        data = torch.load(path, map_location='cpu')
+        return data[i].float()
+
 def train(datasets, cur, args):
     """   
         train for a single fold
@@ -318,6 +338,18 @@ def train(datasets, cur, args):
     _ = model.to(device)
     print('Done!')
     print_network(model)
+
+    if args.ssl_pretrain:
+        encoder_weights = torch.load(os.path.join(args.results_dir, "ssl_pretrained_encoder.pth"))
+        encoder = MLPEncoder(args.embed_dim, 512, args.ssl_proj_dim)
+        encoder.load_state_dict(encoder_weights)
+        if args.freeze_encoder:
+            for param in encoder.parameters():
+                param.requires_grad = False
+        # copy encoder fc weights to model
+        with torch.no_grad():
+            model.attention_net[0].weight.copy_(encoder.fc.weight)
+            model.attention_net[0].bias.copy_(encoder.fc.bias)
 
     print('\nInit optimizer ...', end=' ')
     optimizer = get_optim(model, args)
@@ -534,29 +566,26 @@ def ssl_pretrain(args, encoder, train_loader):
     print("Starting SSL pretraining...")
     encoder.train()
     optimizer = torch.optim.Adam(encoder.parameters(), lr=args.lr)
+
+    def feature_augment(x):
+        noise = torch.randn_like(x) * 0.1
+        return F.dropout(x + noise, p=0.2, training=True)
+
     for epoch in range(args.ssl_epochs):
         total_loss = 0.0
-        for batch_idx, (data, _) in enumerate(train_loader):
+        for batch_idx, data in enumerate(train_loader):
             data = data.to(device)
             optimizer.zero_grad()
-            # SimCLR-style augmentations
-            transform = transforms.Compose([
-                transforms.RandomResizedCrop(size=224),
-                transforms.RandomHorizontalFlip(),
-                transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
-                transforms.RandomGrayscale(p=0.2),
-                transforms.ToTensor()
-            ])
-            x_i = transform(data)
-            x_j = transform(data)
-            z_i = encoder(x_i)
-            z_j = encoder(x_j)
-            # Contrastive loss
+            x_i = feature_augment(data)
+            x_j = feature_augment(data)
+            z_i, _ = encoder(x_i)
+            z_j, _ = encoder(x_j)
             loss = contrastive_loss(z_i, z_j, args.ssl_temp)
             loss.backward()
             optimizer.step()
             total_loss += loss.item()
         print(f"Epoch [{epoch+1}/{args.ssl_epochs}], Loss: {total_loss/len(train_loader):.4f}")
+
     torch.save(encoder.state_dict(), os.path.join(args.results_dir, "ssl_pretrained_encoder.pth"))
     print("SSL pretraining completed.")
 
@@ -578,7 +607,7 @@ def contrastive_loss(z_i, z_j, temperature):
     logits = logits / temperature
     return F.cross_entropy(logits, labels)
 
-def main(args):
+def main(args, dataset):
     # create results directory if necessary
     if not os.path.isdir(args.results_dir):
         os.mkdir(args.results_dir)
@@ -605,14 +634,9 @@ def main(args):
         datasets = (train_dataset, val_dataset, test_dataset)
 
         if args.ssl_pretrain:
-            encoder = ResNet50Encoder(args.embed_dim, args.ssl_proj_dim).to(device)
+            encoder = MLPEncoder(args.embed_dim, 512, args.ssl_proj_dim).to(device)
             ssl_pretrain_loader = get_ssl_loader(train_dataset, args.ssl_batch_size)
             ssl_pretrain(args, encoder, ssl_pretrain_loader)
-            encoder_weights = torch.load(os.path.join(args.results_dir, "ssl_pretrained_encoder.pth"))
-            encoder.load_state_dict(encoder_weights)
-            if args.freeze_encoder:
-                for param in encoder.parameters():
-                    param.requires_grad = False
 
         results, test_auc, val_auc, test_acc, val_acc  = train(datasets, i, args)
         all_test_auc.append(test_auc)
@@ -633,31 +657,23 @@ def main(args):
     final_df.to_csv(os.path.join(args.results_dir, save_name))
 
 def get_ssl_loader(dataset, batch_size):
-    transform = transforms.Compose([
-        transforms.RandomResizedCrop(size=224),
-        transforms.RandomHorizontalFlip(),
-        transforms.RandomApply([transforms.ColorJitter(0.4, 0.4, 0.4, 0.1)], p=0.8),
-        transforms.RandomGrayscale(p=0.2),
-        transforms.ToTensor()
-    ])
-    dataset.transform = transform
-    return DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    patch_dataset = PatchFeatureDataset(dataset)
+    return DataLoader(patch_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
-class ResNet50Encoder(nn.Module):
-    def __init__(self, embed_dim, proj_dim):
-        super(ResNet50Encoder, self).__init__()
-        self.encoder = nn.Sequential(*list(nn.resnet50(pretrained=True).children())[:-1])
-        self.projection_head = nn.Sequential(
-            nn.Linear(2048, proj_dim),
+class MLPEncoder(nn.Module):
+    """Simple MLP used for SSL on patch features."""
+    def __init__(self, embed_dim, hidden_dim, proj_dim):
+        super().__init__()
+        self.fc = nn.Linear(embed_dim, hidden_dim)
+        self.projector = nn.Sequential(
             nn.ReLU(),
-            nn.Linear(proj_dim, proj_dim)
+            nn.Linear(hidden_dim, proj_dim)
         )
 
     def forward(self, x):
-        x = self.encoder(x)
-        x = x.view(x.size(0), -1)
-        x = self.projection_head(x)
-        return x
+        h = self.fc(x)
+        z = self.projector(h)
+        return z, h
 
 # Generic training settings
 parser = argparse.ArgumentParser(description='Configurations for WSI Training')
@@ -713,7 +729,6 @@ parser.add_argument('--ssl_temp', type=float, default=0.5, help='Temperature par
 parser.add_argument('--freeze_encoder', action='store_true', default=True, help='Freeze encoder during fine-tuning')
 parser.add_argument('--finetune_epochs', type=int, default=50, help='Number of epochs for fine-tuning')
 
-args = parser.parse_args()
 device=torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 def seed_torch(seed=7):
@@ -724,88 +739,91 @@ def seed_torch(seed=7):
     torch.manual_seed(seed)
     if device.type == 'cuda':
         torch.cuda.manual_seed(seed)
-        torch.cuda.manual_seed_all(seed) # if you are using multi-GPU.
+        torch.cuda.manual_seed_all(seed)  # if you are using multi-GPU.
     torch.backends.cudnn.benchmark = False
     torch.backends.cudnn.deterministic = True
 
-seed_torch(args.seed)
+if __name__ == "__main__":
+    args = parser.parse_args()
+    seed_torch(args.seed)
 
-encoding_size = 1024
-settings = {'num_splits': args.k, 
-            'k_start': args.k_start,
-            'k_end': args.k_end,
-            'task': args.task,
-            'max_epochs': args.max_epochs, 
-            'results_dir': args.results_dir, 
-            'lr': args.lr,
-            'experiment': args.exp_code,
-            'reg': args.reg,
-            'label_frac': args.label_frac,
-            'bag_loss': args.bag_loss,
-            'seed': args.seed,
-            'model_type': args.model_type,
-            'model_size': args.model_size,
-            "use_drop_out": args.drop_out,
-            'weighted_sample': args.weighted_sample,
-            'opt': args.opt}
-
-if args.model_type in ['clam_sb', 'clam_mb']:
-   settings.update({'bag_weight': args.bag_weight,
-                    'inst_loss': args.inst_loss,
-                    'B': args.B})
-
-print('\nLoad Dataset')
-
-if args.task == 'task_1_tumor_vs_normal':
-    args.n_classes=2
-    dataset = Generic_MIL_Dataset(csv_path = 'C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual/labels_ims1_filtered.csv',
-                            data_dir= args.data_root_dir,
-                            shuffle = False, 
-                            seed = args.seed, 
-                            print_info = True,
-                            label_dict = {'normal_tissue':0, 'tumor_tissue':1},
-                            patient_strat=False,
-                            ignore=[])
-
-elif args.task == 'task_2_tumor_subtyping':
-    args.n_classes=3
-    dataset = Generic_MIL_Dataset(csv_path = 'dataset_csv/tumor_subtyping_dummy_clean.csv',
-                            data_dir= os.path.join(args.data_root_dir, 'tumor_subtyping_resnet_features'),
-                            shuffle = False, 
-                            seed = args.seed, 
-                            print_info = True,
-                            label_dict = {'subtype_1':0, 'subtype_2':1, 'subtype_3':2},
-                            patient_strat= False,
-                            ignore=[])
+    encoding_size = 1024
+    settings = {
+        'num_splits': args.k,
+        'k_start': args.k_start,
+        'k_end': args.k_end,
+        'task': args.task,
+        'max_epochs': args.max_epochs,
+        'results_dir': args.results_dir,
+        'lr': args.lr,
+        'experiment': args.exp_code,
+        'reg': args.reg,
+        'label_frac': args.label_frac,
+        'bag_loss': args.bag_loss,
+        'seed': args.seed,
+        'model_type': args.model_type,
+        'model_size': args.model_size,
+        "use_drop_out": args.drop_out,
+        'weighted_sample': args.weighted_sample,
+        'opt': args.opt,
+    }
 
     if args.model_type in ['clam_sb', 'clam_mb']:
-        assert args.subtyping 
-        
-else:
-    raise NotImplementedError
-    
-if not os.path.isdir(args.results_dir):
-    os.mkdir(args.results_dir)
+        settings.update({'bag_weight': args.bag_weight, 'inst_loss': args.inst_loss, 'B': args.B})
 
-args.results_dir = os.path.join(args.results_dir, str(args.exp_code) + '_s{}'.format(args.seed))
-if not os.path.isdir(args.results_dir):
-    os.mkdir(args.results_dir)
+    print('\nLoad Dataset')
 
-print('split_dir: ', args.split_dir)
-assert os.path.isdir(args.split_dir)
+    if args.task == 'task_1_tumor_vs_normal':
+        args.n_classes = 2
+        dataset = Generic_MIL_Dataset(
+            csv_path='C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual/labels_ims1_filtered.csv',
+            data_dir=args.data_root_dir,
+            shuffle=False,
+            seed=args.seed,
+            print_info=True,
+            label_dict={'normal_tissue': 0, 'tumor_tissue': 1},
+            patient_strat=False,
+            ignore=[],
+        )
 
-settings.update({'split_dir': args.split_dir})
+    elif args.task == 'task_2_tumor_subtyping':
+        args.n_classes = 3
+        dataset = Generic_MIL_Dataset(
+            csv_path='dataset_csv/tumor_subtyping_dummy_clean.csv',
+            data_dir=os.path.join(args.data_root_dir, 'tumor_subtyping_resnet_features'),
+            shuffle=False,
+            seed=args.seed,
+            print_info=True,
+            label_dict={'subtype_1': 0, 'subtype_2': 1, 'subtype_3': 2},
+            patient_strat=False,
+            ignore=[],
+        )
 
+        if args.model_type in ['clam_sb', 'clam_mb']:
+            assert args.subtyping
 
-with open(args.results_dir + '/experiment_{}.txt'.format(args.exp_code), 'w') as f:
-    print(settings, file=f)
-f.close()
+    else:
+        raise NotImplementedError
 
-print("################# Settings ###################")
-for key, val in settings.items():
-    print("{}:  {}".format(key, val))        
+    if not os.path.isdir(args.results_dir):
+        os.mkdir(args.results_dir)
 
-if __name__ == "__main__":
-    results = main(args)
+    args.results_dir = os.path.join(args.results_dir, str(args.exp_code) + f'_s{args.seed}')
+    if not os.path.isdir(args.results_dir):
+        os.mkdir(args.results_dir)
+
+    print('split_dir: ', args.split_dir)
+    assert os.path.isdir(args.split_dir)
+
+    settings.update({'split_dir': args.split_dir})
+
+    with open(args.results_dir + f'/experiment_{args.exp_code}.txt', 'w') as f:
+        print(settings, file=f)
+
+    print("################# Settings ###################")
+    for key, val in settings.items():
+        print(f"{key}:  {val}")
+
+    results = main(args, dataset)
     print("finished!")
     print("end script")
