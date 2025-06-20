@@ -652,7 +652,7 @@ def contrastive_loss(z_i, z_j, temperature):
     logits = logits / temperature
     return F.cross_entropy(logits, labels)
 
-def main(args, dataset, dataset):
+def main(args, dataset):
     # create results directory if necessary
     if not os.path.isdir(args.results_dir):
         os.mkdir(args.results_dir)
@@ -707,12 +707,6 @@ def get_ssl_loader(dataset, batch_size):
     patch_dataset = PatchFeatureDataset(dataset)
     return DataLoader(patch_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
 
-class MLPEncoder(nn.Module):
-    """Simple MLP used for SSL on patch features."""
-    def __init__(self, embed_dim, hidden_dim, proj_dim):
-        super().__init__()
-        self.fc = nn.Linear(embed_dim, hidden_dim)
-        self.projector = nn.Sequential(
 class MLPEncoder(nn.Module):
     """Simple MLP used for SSL on patch features."""
     def __init__(self, embed_dim, hidden_dim, proj_dim):
@@ -800,8 +794,6 @@ def seed_torch(seed=7):
     torch.backends.cudnn.deterministic = True
 
 if __name__ == "__main__":
-    args = parser.parse_args()
-    if __name__ == "__main__":
     args = parser.parse_args()
     seed_torch(args.seed)
 
