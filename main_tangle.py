@@ -103,6 +103,8 @@ parser.add_argument('--task', type=str, choices=['task_1_tumor_vs_normal',  'tas
 # Tangle-specific options
 parser.add_argument('--use_tangle_concatenation', action='store_true', default=False,
                      help='Enable concatenation of Tangle embeddings with patch features.')
+parser.add_argument('--use_tangle_fusion', action='store_true', default=False,
+                    help='Fuse patch features with Tangle embeddings via a learned module.')
 parser.add_argument('--tangle_feature_dir', type=str, default=None,
                      help='Directory containing Tangle embedding .npy files.')
 parser.add_argument('--tangle_embedding_dim', type=int, default=1024,
@@ -135,7 +137,10 @@ def seed_torch(seed=7):
 
 seed_torch(args.seed)
 
-# Handle Tangle feature concatenation
+# Handle Tangle feature concatenation or fusion
+if args.use_tangle_concatenation and args.use_tangle_fusion:
+    raise ValueError("Cannot use both concatenation and fusion simultaneously")
+
 if args.use_tangle_concatenation:
     print("Tangle embedding concatenation enabled.")
     assert args.tangle_feature_dir is not None, "A directory for Tangle features must be specified via --tangle_feature_dir"
@@ -144,6 +149,15 @@ if args.use_tangle_concatenation:
     # Update the embedding dimension for the model
     args.embed_dim += args.tangle_embedding_dim
     print(f"Combined feature dim for model: {args.embed_dim}")
+    tangle_kwargs = {
+        "tangle_feature_dir": args.tangle_feature_dir,
+        "tangle_embedding_dim": args.tangle_embedding_dim
+    }
+elif args.use_tangle_fusion:
+    print("Tangle embedding fusion enabled.")
+    assert args.tangle_feature_dir is not None, "A directory for Tangle features must be specified via --tangle_feature_dir"
+    print(f"Patch feature dim: {args.embed_dim}")
+    print(f"Tangle feature dim: {args.tangle_embedding_dim}")
     tangle_kwargs = {
         "tangle_feature_dir": args.tangle_feature_dir,
         "tangle_embedding_dim": args.tangle_embedding_dim
@@ -170,6 +184,7 @@ settings = {'num_splits': args.k,
             'weighted_sample': args.weighted_sample,
             'opt': args.opt,
             'use_tangle_concatenation': args.use_tangle_concatenation,
+            'use_tangle_fusion': args.use_tangle_fusion,
             'tangle_feature_dir': args.tangle_feature_dir,
             'embed_dim': args.embed_dim}
 
