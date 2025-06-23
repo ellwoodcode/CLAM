@@ -1,0 +1,17 @@
+data_root_dir: C:/Users/Mahon/Documents/Research/CLAM/Phase3A_Baseline_Features/Evals
+tangle_dir: C:/Users/Mahon/Documents/Research/CLAM/EVAL_tangle_embeddings
+label_dir: C:/Users/Mahon/Documents/Research/CLAM/Labels/Textual
+cohort: Georgia
+cohort_labels: Georgia_filtered
+results_dir: ./results_fusion
+models_exp_code: tangle_CMF_s1
+save_exp_code: tangle_CMF_eval
+k: 3
+fold: -1
+model_type: clam_sb
+model_size: small
+drop_out: 0.25
+embed_dim: 1024
+tangle_embedding_dim: 1024
+save_dir: ./eval_results\EVAL_tangle_CMF_eval
+models_dir: ./results_fusion\tangle_CMF_s1
